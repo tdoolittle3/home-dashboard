@@ -1,0 +1,17 @@
+# Builds and runs the dashboard from this checkout. Handy for testing the
+# container locally; on ladybird the deployment lives in the home-automation
+# repo under stacks/dash/ so all of that host's compose files stay together.
+services:
+  dashboard:
+    build: .
+    image: home-dashboard:local
+    container_name: home-dashboard
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "8099:8099"
+    volumes:
+      # Edit panels without rebuilding the image; restart to pick them up.
+      - ./config/dashboard.json:/app/config/dashboard.json:ro
+    environment:
+      DASHBOARD_CONFIG: /app/config/dashboard.json
