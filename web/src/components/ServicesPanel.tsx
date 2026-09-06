@@ -1,5 +1,6 @@
 import { formatEpoch, formatMb, formatNumber, formatUptime } from '../format';
-import type { HaStatus, SourcesSnapshot } from '../types';
+import type { FrigateSummary, HaStatus, SourcesSnapshot } from '../types';
+import { DiskPie } from './DiskPie';
 import { Panel } from './Panel';
 
 interface ServicesPanelProps {
@@ -21,6 +22,48 @@ function Tile({ name, ok, detail, note }: { name: string; ok: boolean | null; de
   );
 }
 
+interface MountGroup {
+  mount: string;
+  alsoServes: string[];
+  totalMb: number | null;
+  usedMb: number | null;
+  freeMb: number | null;
+}
+
+type SizedMountGroup = MountGroup & { totalMb: number; usedMb: number; freeMb: number };
+
+/**
+ * Frigate reports one row per configured path, so several paths on one
+ * filesystem come back with identical figures - on this host `recordings` and
+ * `clips` are the same disk. Group by those figures so the same drive is not
+ * drawn twice.
+ */
+function groupMounts(storage: FrigateSummary['storage']): MountGroup[] {
+  const groups = new Map<string, MountGroup>();
+
+  for (const entry of storage) {
+    const key = `${entry.totalMb}|${entry.usedMb}|${entry.freeMb}`;
+    const existing = groups.get(key);
+    if (existing) {
+      existing.alsoServes.push(entry.mount);
+    } else {
+      groups.set(key, {
+        mount: entry.mount,
+        alsoServes: [],
+        totalMb: entry.totalMb,
+        usedMb: entry.usedMb,
+        freeMb: entry.freeMb,
+      });
+    }
+  }
+
+  return [...groups.values()];
+}
+
+function hasSizes(group: MountGroup): group is SizedMountGroup {
+  return group.totalMb !== null && group.usedMb !== null && group.freeMb !== null && group.totalMb > 0;
+}
+
 export function ServicesPanel({ ha, sources }: ServicesPanelProps) {
   const { frigate, jellyfin, uptimeKuma } = sources;
 
@@ -39,6 +82,12 @@ export function ServicesPanel({ ha, sources }: ServicesPanelProps) {
       ? 'no monitors configured'
       : `${uptimeKuma.data.up} up / ${uptimeKuma.data.down} down`
     : (uptimeKuma?.error ?? 'not configured');
+
+  // The hard drive is the largest filesystem Frigate reports; the remainder are
+  // small tmpfs mounts that say more as a line of text than as a chart.
+  const mountGroups = frigate?.ok ? groupMounts(frigate.data.storage) : [];
+  const disk = mountGroups.filter(hasSizes).sort((a, b) => b.totalMb - a.totalMb)[0];
+  const otherMounts = mountGroups.filter((group) => group !== disk);
 
   return (
     <Panel title="Services">
@@ -61,13 +110,26 @@ export function ServicesPanel({ ha, sources }: ServicesPanelProps) {
         <Tile name="Uptime Kuma" ok={uptimeKuma ? uptimeKuma.ok : null} detail={kumaDetail} />
       </div>
 
-      {frigate?.ok && frigate.data.storage.length > 0 ? (
+      {disk ? (
+        <>
+          <h3 className="subhead">Hard drive</h3>
+          <DiskPie
+            mount={disk.mount}
+            alsoServes={disk.alsoServes}
+            totalMb={disk.totalMb}
+            usedMb={disk.usedMb}
+            freeMb={disk.freeMb}
+          />
+        </>
+      ) : null}
+
+      {otherMounts.length > 0 ? (
         <ul className="rows rows--tight">
-          {frigate.data.storage.map((mount) => (
-            <li key={mount.mount} className="row">
-              <span className="row__label">{mount.mount}</span>
-              <span className="row__value">{formatMb(mount.usedMb)} used</span>
-              <span className="row__meta">{formatMb(mount.freeMb)} free</span>
+          {otherMounts.map((group) => (
+            <li key={group.mount} className="row">
+              <span className="row__label">{[group.mount, ...group.alsoServes].join(', ')}</span>
+              <span className="row__value">{formatMb(group.usedMb)} used</span>
+              <span className="row__meta">{formatMb(group.freeMb)} free</span>
             </li>
           ))}
         </ul>

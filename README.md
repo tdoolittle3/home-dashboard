@@ -113,6 +113,14 @@ is mounted read-only in the container.
 
 `controls` panels double as the write allowlist, so there is no second list to drift out of sync.
 
+`cameras` panels render polled stills. Clicking one opens a full-screen viewer that asks the proxy
+for a 1080px frame — the ceiling it allows — with pause, manual refresh, camera switching and real
+browser fullscreen. Escape closes it; the arrow keys move between cameras.
+
+The Services panel draws the largest filesystem Frigate reports as a used/free pie. Paths that share
+a filesystem report identical figures, so they are grouped rather than charted twice; the small
+tmpfs mounts stay as text.
+
 Entity ids come from HA → Developer tools → States. The defaults use the storage-guard sensors and
 `switch.frontcam_white_light` — the only working white-light control on the driveway camera.
 
@@ -168,8 +176,12 @@ enabled at boot, so it survives a reboot. Checked against the deployed container
   through the published port.
 - **SSE** delivered its opening `snapshot` frame.
 - **Reachable** from the LAN and over Tailscale (`100.69.144.83:8099`).
-- **HA** reports `authFailed: true` because `.env` still holds the `replace-me` placeholder; the
-  UI surfaces this as *token rejected · replace HA_TOKEN* rather than failing to boot.
+- **Home Assistant connected** once a real token replaced the placeholder: `connected: true`,
+  version **2026.8.3**, `authFailed: false`.
+- **`get_states`** resolved all six configured entities with live values — none came back `unknown`
+  or `unavailable`, so the entity ids taken from the `home-automation` notes were all correct.
+- **`subscribe_events`** is pushing: the storage sensors carry `just now` timestamps that advance
+  without a reload, which is state arriving over the subscription rather than the opening snapshot.
 
 ---
 
@@ -186,10 +198,9 @@ Run against ladybird with a deliberately invalid HA token:
 
 Not yet verified, and why:
 
-- **Live HA data.** No long-lived token exists yet, so `get_states`, `subscribe_events` and
-  `call_service` are written to the documented protocol but unexercised. The entity ids in
-  `config/dashboard.json` come from the `home-automation` notes, not from a live `get_states` — expect
-  to correct a couple.
+- **`call_service`.** The one HA path still unexercised. The only allowlisted control is
+  `switch.frontcam_white_light`, so testing it means physically switching on the driveway
+  floodlight — left for a deliberate click rather than a test run.
 - **Uptime Kuma.** Kuma has no documented REST API; its own UI talks socket.io. This reads the
   Prometheus `/metrics` endpoint with an API key as the HTTP basic password, which is **unconfirmed
   on this instance**. Kuma also has no monitors configured yet, so an empty list is the expected
