@@ -118,17 +118,58 @@ Entity ids come from HA → Developer tools → States. The defaults use the sto
 
 ## Deploying to ladybird
 
+**Deployed and running** at <http://192.168.0.13:8099> since 2026-09-05.
+
+The root `docker-compose.yml` here is for local testing only. On the server the deployment lives in
+`home-automation` under `stacks/dash/`, so every compose file for that host stays in one repo — see
+that repo's `docs/operations.md` for the runbook.
+
+How it is laid out on the host:
+
+| Path | What it is |
+|---|---|
+| `~thomas/src/home-dashboard` | build input only — plain source Docker reads to bake the image |
+| `home-dashboard:local` | the built image; Node and both builds live inside it |
+| `/opt/stacks/dash/docker-compose.yml` | the deployed stack definition |
+| `/opt/stacks/dash/.env` | `HA_TOKEN` and friends, mode 600, gitignored |
+
+There is no registry image and no git remote, so the source is copied over and built on the host:
+
 ```bash
-docker compose up -d --build
+# from a workstation, in this repo
+git archive --format=tar HEAD > /tmp/hd.tar && scp /tmp/hd.tar thomas@192.168.0.13:/tmp/
+
+# on the server
+rm -rf ~/src/home-dashboard && mkdir -p ~/src/home-dashboard
+tar -xf /tmp/hd.tar -C ~/src/home-dashboard
+cd /opt/stacks/dash && docker compose up -d --build
 ```
 
-That compose file is for local testing. On the server the deployment belongs in `home-automation`
-under `stacks/dash/`, so every compose file for that host stays in one repo:
+Nothing runs from the source directory — the host has no Node installed at all. Deleting the
+checkout does not stop the container; it only prevents the next rebuild.
 
-- `stacks/dash/docker-compose.yml` pointing at the built image
-- a row in that repo's README services table
-- an image digest in its `VERSIONS.txt`
-- a note in `docs/operations.md`
+`docker compose restart` does **not** reload `.env`. After changing a token use
+`docker compose up -d --force-recreate`.
+
+---
+
+## Verified in the container on ladybird (2026-09-05)
+
+The image built clean on the host (Docker 29.7.2) and the container came up `healthy` on its own
+`HEALTHCHECK`, running as the non-root `node` user with `restart: unless-stopped`. Docker is
+enabled at boot, so it survives a reboot. Checked against the deployed container on `:8099`:
+
+- **Frontend** served from the image at `/app/web/dist` — the page renders, and both camera panels
+  show live stills.
+- **Camera proxy** returned a real 45 KB `image/jpeg` (704×480) from `driveway`.
+- **Frigate** reported both cameras and four storage mounts; the storage panel shows 97.7 GB used
+  of 331.2 GB free.
+- **Allowlists** still rejected an unlisted camera (404) and an unlisted entity (403) — this time
+  through the published port.
+- **SSE** delivered its opening `snapshot` frame.
+- **Reachable** from the LAN and over Tailscale (`100.69.144.83:8099`).
+- **HA** reports `authFailed: true` because `.env` still holds the `replace-me` placeholder; the
+  UI surfaces this as *token rejected · replace HA_TOKEN* rather than failing to boot.
 
 ---
 
