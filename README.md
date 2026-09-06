@@ -19,7 +19,7 @@ client, so this app is one:
   hundreds of device protocols; rewriting the UI is a weekend.
 
 Non-HA services are read from their own APIs where that gives more than the HA integration does
-(Frigate) or where no integration is in play (Jellyfin, Uptime Kuma).
+(Frigate) or where no integration is in play (Jellyfin, Uptime Kuma, Immich).
 
 ### The token never reaches the browser
 
@@ -27,10 +27,11 @@ An HA long-lived access token is full control of the house. A static SPA holding
 who loads the page — or reads the JS bundle — owns HA. So there is a small backend:
 
 ```
-browser ──/api──> server (holds HA + Jellyfin tokens) ──> HA :8123
-                                                     ├──> Frigate :5000
-                                                     ├──> Jellyfin :8096
-                                                     └──> Uptime Kuma :3001
+browser ──/api──> server (holds every API key) ──> HA :8123
+                                              ├──> Frigate :5000
+                                              ├──> Jellyfin :8096
+                                              ├──> Uptime Kuma :3001
+                                              └──> Immich :2283
 ```
 
 The server also:
@@ -53,7 +54,7 @@ port-forwarded.
 ```
 server/           Fastify backend (TypeScript, ESM)
   src/ha/         Home Assistant WebSocket client
-  src/sources/    Frigate, Jellyfin, Uptime Kuma readers
+  src/sources/    Frigate, Jellyfin, Uptime Kuma, Immich readers
   src/routes/     REST endpoints + the SSE stream
   src/snapshot.ts assembles the payload the browser renders
 web/              Vite + React frontend
@@ -89,8 +90,14 @@ cp .env.example .env
 Then get an HA token: Home Assistant → your profile → Security → **Long-lived access tokens** →
 Create token. Paste it into `.env` as `HA_TOKEN`.
 
-Jellyfin's key comes from Dashboard → API Keys. Both are optional except `HA_*`; an unconfigured
-service shows as "not configured" rather than breaking the page.
+Everything except `HA_*` is optional; an unconfigured service shows as "not configured" rather than
+breaking the page. The other keys:
+
+| Service | Where the key comes from | Notes |
+|---|---|---|
+| Jellyfin | Dashboard → API Keys → **+** | sent as `X-Emby-Token` |
+| Uptime Kuma | Settings → API Keys → **Add** | used as the HTTP basic password on `/metrics`; Kuma ignores the username |
+| Immich | Account settings → API Keys → **New**, signed in as the **admin** | sent as `x-api-key`. Library totals and the job queue are admin-only; a non-admin key gets version and disk figures only |
 
 ```bash
 npm run dev
@@ -107,11 +114,26 @@ npm run build && npm start
 
 ## Configuring panels
 
-`config/dashboard.json` — three panel types (`entities`, `controls`, `cameras`), validated at
-startup so a typo fails loudly instead of rendering an empty box. Edit and restart; no rebuild. It
+`config/dashboard.json` — four panel types (`entities`, `controls`, `cameras`, `service`), validated
+at startup so a typo fails loudly instead of rendering an empty box. Edit and restart; no rebuild. It
 is mounted read-only in the container.
 
 `controls` panels double as the write allowlist, so there is no second list to drift out of sync.
+
+`service` panels show one polled service in depth; `"service"` is `uptimeKuma`, `jellyfin` or
+`immich`. Each needs its `*_BASE_URL` and `*_API_KEY` in `.env`, and the panel names them when they
+are missing rather than rendering empty:
+
+- **Uptime Kuma** — every monitor with its state, latency while up, what it watches, and days left
+  on the certificate for HTTPS targets (red under 14). Read from Kuma's Prometheus `/metrics`
+  endpoint, since Kuma has no REST API of its own.
+- **Jellyfin** — library counts, what is playing (with position), and what was added recently.
+  Sessions idle for more than fifteen minutes are stale clients and are not counted as viewers.
+- **Immich** — photo and video totals, library size, the photo disk as a fill bar, usage per user,
+  and the job queues (thumbnails, machine learning, transcodes) that are busy, failing, or paused.
+
+The compact **Services** strip in the side column keeps one tile per service regardless, so the
+detail panels can be dropped from the config without losing the up/down view.
 
 `cameras` panels render polled stills. Clicking one opens a full-screen viewer that asks the proxy
 for a 1080px frame — the ceiling it allows — with pause, manual refresh, camera switching and real
@@ -211,11 +233,20 @@ Not yet verified, and why:
   `switch.frontcam_white_light`, so testing it means physically switching on the driveway
   floodlight — left for a deliberate click rather than a test run.
 - **Uptime Kuma.** Kuma has no documented REST API; its own UI talks socket.io. This reads the
-  Prometheus `/metrics` endpoint with an API key as the HTTP basic password, which is **unconfirmed
-  on this instance**. Kuma also has no monitors configured yet, so an empty list is the expected
-  result today.
-- **Jellyfin.** No API key issued yet. `/Items/Counts` has come and gone across versions and is
-  treated as optional.
+  Prometheus `/metrics` endpoint with an API key as the HTTP basic password. On 2026-09-06 the live
+  instance answered `401` to an unauthenticated `/metrics`, so the endpoint is there and only the
+  key is missing. Kuma also has no monitors configured yet, so an empty list is the expected result
+  today.
+- **Jellyfin.** No API key issued yet. The live server (10.11.11) answers `401` rather than `404`
+  on `/Sessions`, `/Items/Counts` and `/Items`, so every route this reads exists on that version;
+  the counts and recently-added list are still treated as optional.
+- **Immich.** No API key issued yet. The live server (3.1.0 on `:2283`) answers `401` on
+  `/api/server/about`, `/api/server/statistics`, `/api/server/storage` and `/api/jobs`, so the
+  routes exist. Statistics and jobs are admin-only; the key must be created by the admin account.
+
+All three readers were exercised against a local stand-in serving each service's documented
+response shapes, including the 401 and not-configured paths, and the resulting panels were
+screenshotted. What remains is running them against the real services once keys exist.
 - **Frigate `recentEvents`** is empty because `/api/events` genuinely returns `[]` right now — no
   retained detections, not a parse failure.
 
@@ -227,4 +258,5 @@ reported as `null` when absent rather than crashing the panel.
 - Sparklines from HA's history API (`history/history_during_period` over the WebSocket).
 - Live video via go2rtc/WebRTC instead of polled stills — that only changes `CamerasPanel`.
 - Alert badges driven by `binary_sensor.ladybird_storage_storage_problem`.
-- Immich once that stack is deployed.
+- Issue the Jellyfin, Uptime Kuma and Immich API keys on the server and add them to
+  `/opt/stacks/dash/.env`, then `docker compose up -d --force-recreate` to pick them up.

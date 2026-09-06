@@ -2,6 +2,7 @@ import type { AppConfig, DashboardConfig } from './config.js';
 import type { HaClient, HaStatus, HassState } from './ha/client.js';
 import { createFrigateSource, type FrigateSummary } from './sources/frigate.js';
 import { cached, toResult, type SourceResult } from './sources/http.js';
+import { createImmichSource, type ImmichSummary } from './sources/immich.js';
 import { createJellyfinSource, type JellyfinSummary } from './sources/jellyfin.js';
 import { createUptimeKumaSource, type KumaSummary } from './sources/uptimeKuma.js';
 
@@ -21,6 +22,7 @@ export interface SourcesSnapshot {
   frigate: SourceResult<FrigateSummary> | null;
   jellyfin: SourceResult<JellyfinSummary> | null;
   uptimeKuma: SourceResult<KumaSummary> | null;
+  immich: SourceResult<ImmichSummary> | null;
 }
 
 export interface Snapshot {
@@ -72,21 +74,24 @@ export class SnapshotBuilder {
   #frigate: (() => Promise<SourceResult<FrigateSummary>>) | null;
   #jellyfin: (() => Promise<SourceResult<JellyfinSummary>>) | null;
   #uptimeKuma: (() => Promise<SourceResult<KumaSummary>>) | null;
+  #immich: (() => Promise<SourceResult<ImmichSummary>>) | null;
 
   constructor(config: AppConfig, ha: HaClient) {
     this.#config = config;
     this.#ha = ha;
 
     const ttl = config.sourceTtlMs;
-    const { frigate, jellyfin, uptimeKuma } = config;
+    const { frigate, jellyfin, uptimeKuma, immich } = config;
 
     const frigateSource = frigate ? createFrigateSource(frigate.baseUrl) : null;
     const jellyfinSource = jellyfin ? createJellyfinSource(jellyfin.baseUrl, jellyfin.apiKey) : null;
     const kumaSource = uptimeKuma ? createUptimeKumaSource(uptimeKuma.baseUrl, uptimeKuma.apiKey) : null;
+    const immichSource = immich ? createImmichSource(immich.baseUrl, immich.apiKey) : null;
 
     this.#frigate = frigateSource ? cached(ttl, () => toResult('frigate', frigateSource)) : null;
     this.#jellyfin = jellyfinSource ? cached(ttl, () => toResult('jellyfin', jellyfinSource)) : null;
     this.#uptimeKuma = kumaSource ? cached(ttl, () => toResult('uptime-kuma', kumaSource)) : null;
+    this.#immich = immichSource ? cached(ttl, () => toResult('immich', immichSource)) : null;
   }
 
   entities(): Record<string, EntitySnapshot> {
@@ -98,12 +103,13 @@ export class SnapshotBuilder {
   }
 
   async sources(): Promise<SourcesSnapshot> {
-    const [frigate, jellyfin, uptimeKuma] = await Promise.all([
+    const [frigate, jellyfin, uptimeKuma, immich] = await Promise.all([
       this.#frigate ? this.#frigate() : Promise.resolve(null),
       this.#jellyfin ? this.#jellyfin() : Promise.resolve(null),
       this.#uptimeKuma ? this.#uptimeKuma() : Promise.resolve(null),
+      this.#immich ? this.#immich() : Promise.resolve(null),
     ]);
-    return { frigate, jellyfin, uptimeKuma };
+    return { frigate, jellyfin, uptimeKuma, immich };
   }
 
   async build(): Promise<Snapshot> {

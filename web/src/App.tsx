@@ -1,8 +1,11 @@
 import { CamerasPanel } from './components/CamerasPanel';
 import { ControlsPanel } from './components/ControlsPanel';
 import { EntitiesPanel } from './components/EntitiesPanel';
+import { MediaPanel } from './components/MediaPanel';
+import { PhotosPanel } from './components/PhotosPanel';
 import { ServicesPanel } from './components/ServicesPanel';
 import { StoragePanel } from './components/StoragePanel';
+import { UptimePanel } from './components/UptimePanel';
 import { formatRelative } from './format';
 import type { Panel } from './types';
 import { useDashboard } from './useDashboard';
@@ -61,6 +64,16 @@ export function App() {
     }
     if (panel.type === 'controls') {
       return <ControlsPanel key={panel.id} title={panel.title} refs={panel.entities} entities={entities} />;
+    }
+    if (panel.type === 'service') {
+      switch (panel.service) {
+        case 'uptimeKuma':
+          return <UptimePanel key={panel.id} title={panel.title} result={sources.uptimeKuma} />;
+        case 'jellyfin':
+          return <MediaPanel key={panel.id} title={panel.title} result={sources.jellyfin} />;
+        case 'immich':
+          return <PhotosPanel key={panel.id} title={panel.title} result={sources.immich} />;
+      }
     }
     if (panel.chart === 'disk') {
       return (

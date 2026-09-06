@@ -5,6 +5,7 @@
     "Panel order here is the order they render. The first 'cameras' panel is the hero row at the top.",
     "Panels of type 'controls' double as the write allowlist: /api/action refuses any entity not listed here.",
     "An 'entities' panel with \"chart\": \"disk\" also draws the largest filesystem Frigate reports.",
+    "A 'service' panel shows one polled service in depth: \"service\" is uptimeKuma, jellyfin or immich. It needs that service's *_BASE_URL and *_API_KEY in .env, and says so when they are missing.",
     "Find entity ids in Home Assistant under Developer tools -> States."
   ],
   "panels": [
@@ -32,6 +33,24 @@
       ]
     },
     {
+      "id": "uptime",
+      "title": "Uptime",
+      "type": "service",
+      "service": "uptimeKuma"
+    },
+    {
+      "id": "media",
+      "title": "Media",
+      "type": "service",
+      "service": "jellyfin"
+    },
+    {
+      "id": "photos",
+      "title": "Photos",
+      "type": "service",
+      "service": "immich"
+    },
+    {
       "id": "controls",
       "title": "Controls",
       "type": "controls",
@@ -44,6 +63,7 @@
     { "label": "Home Assistant", "url": "http://192.168.0.13:8123" },
     { "label": "Frigate", "url": "https://192.168.0.13:8971" },
     { "label": "Jellyfin", "url": "http://192.168.0.13:8096" },
-    { "label": "Uptime Kuma", "url": "http://192.168.0.13:3001" }
+    { "label": "Uptime Kuma", "url": "http://192.168.0.13:3001" },
+    { "label": "Immich", "url": "http://192.168.0.13:2283" }
   ]
 }

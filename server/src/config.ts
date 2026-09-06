@@ -22,7 +22,12 @@ export type Panel =
       chart?: 'disk';
     }
   | { id: string; title: string; type: 'controls'; entities: EntityRef[] }
-  | { id: string; title: string; type: 'cameras'; cameras: CameraRef[]; refreshSeconds?: number };
+  | { id: string; title: string; type: 'cameras'; cameras: CameraRef[]; refreshSeconds?: number }
+  | { id: string; title: string; type: 'service'; service: ServiceName };
+
+/** Polled services that get a panel of their own. Each needs its `*_BASE_URL` and key in .env. */
+export const SERVICE_NAMES = ['uptimeKuma', 'jellyfin', 'immich'] as const;
+export type ServiceName = (typeof SERVICE_NAMES)[number];
 
 export interface DashboardConfig {
   title: string;
@@ -37,6 +42,7 @@ export interface AppConfig {
   frigate: { baseUrl: string } | null;
   jellyfin: { baseUrl: string; apiKey: string } | null;
   uptimeKuma: { baseUrl: string; apiKey: string } | null;
+  immich: { baseUrl: string; apiKey: string } | null;
   sourceTtlMs: number;
   sourcePushMs: number;
   dashboard: DashboardConfig;
@@ -106,6 +112,12 @@ function loadDashboard(path: string): DashboardConfig {
           throw new Error(`${path}: invalid camera name "${camera.name}" in panel "${panel.id}"`);
         }
       }
+    } else if (panel.type === 'service') {
+      if (!(SERVICE_NAMES as readonly string[]).includes(panel.service)) {
+        throw new Error(
+          `${path}: panel "${panel.id}" has unknown service "${panel.service}" - one of ${SERVICE_NAMES.join(', ')}`,
+        );
+      }
     } else {
       // `panel` has narrowed to never here, so read the raw JSON shape instead.
       const unknown = panel as unknown as { id: string; type: string };
@@ -133,7 +145,7 @@ export function loadConfig(): AppConfig {
       if (panel.type === 'controls') {
         for (const entity of panel.entities) controllable.add(entity.entity_id);
       }
-    } else {
+    } else if (panel.type === 'cameras') {
       for (const camera of panel.cameras) cameras.add(camera.name);
     }
   }
@@ -142,6 +154,8 @@ export function loadConfig(): AppConfig {
   const jellyfinKey = optional('JELLYFIN_API_KEY');
   const kumaBase = optional('UPTIME_KUMA_BASE_URL');
   const kumaKey = optional('UPTIME_KUMA_API_KEY');
+  const immichBase = optional('IMMICH_BASE_URL');
+  const immichKey = optional('IMMICH_API_KEY');
   const frigateBase = optional('FRIGATE_BASE_URL');
 
   return {
@@ -151,6 +165,7 @@ export function loadConfig(): AppConfig {
     frigate: frigateBase ? { baseUrl: stripTrailingSlash(frigateBase) } : null,
     jellyfin: jellyfinBase && jellyfinKey ? { baseUrl: stripTrailingSlash(jellyfinBase), apiKey: jellyfinKey } : null,
     uptimeKuma: kumaBase && kumaKey ? { baseUrl: stripTrailingSlash(kumaBase), apiKey: kumaKey } : null,
+    immich: immichBase && immichKey ? { baseUrl: stripTrailingSlash(immichBase), apiKey: immichKey } : null,
     sourceTtlMs: num('SOURCE_TTL_SECONDS', 10) * 1000,
     sourcePushMs: num('SOURCE_PUSH_SECONDS', 15) * 1000,
     dashboard,

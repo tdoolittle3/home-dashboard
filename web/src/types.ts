@@ -30,6 +30,9 @@ export interface CameraRef {
   label?: string;
 }
 
+/** Polled services that get a panel of their own. Mirrors SERVICE_NAMES in server/src/config.ts. */
+export type ServiceName = 'uptimeKuma' | 'jellyfin' | 'immich';
+
 export type Panel =
   | {
       id: string;
@@ -40,7 +43,8 @@ export type Panel =
       chart?: 'disk';
     }
   | { id: string; title: string; type: 'controls'; entities: EntityRef[] }
-  | { id: string; title: string; type: 'cameras'; cameras: CameraRef[]; refreshSeconds?: number };
+  | { id: string; title: string; type: 'cameras'; cameras: CameraRef[]; refreshSeconds?: number }
+  | { id: string; title: string; type: 'service'; service: ServiceName };
 
 export interface DashboardConfig {
   title: string;
@@ -74,35 +78,96 @@ export interface FrigateSummary {
   }[];
 }
 
+export interface JellyfinSession {
+  user: string | null;
+  client: string | null;
+  device: string | null;
+  nowPlaying: string | null;
+  paused: boolean;
+  progressPercent: number | null;
+  lastActivity: string | null;
+}
+
+export interface JellyfinRecentItem {
+  id: string;
+  name: string;
+  type: string | null;
+  series: string | null;
+  year: number | null;
+  addedAt: string | null;
+}
+
 export interface JellyfinSummary {
   serverName: string | null;
   version: string | null;
-  sessions: {
-    user: string | null;
-    client: string | null;
-    device: string | null;
-    nowPlaying: string | null;
-    paused: boolean;
-  }[];
+  sessions: JellyfinSession[];
+  playing: number;
   counts: Record<string, number> | null;
+  recentlyAdded: JellyfinRecentItem[];
+}
+
+export type KumaStatus = 'up' | 'down' | 'pending' | 'maintenance' | 'unknown';
+
+export interface KumaMonitor {
+  name: string;
+  type: string | null;
+  target: string | null;
+  status: KumaStatus;
+  responseTimeMs: number | null;
+  certDaysRemaining: number | null;
 }
 
 export interface KumaSummary {
-  monitors: {
-    name: string;
-    type: string | null;
-    status: 'up' | 'down' | 'pending' | 'maintenance' | 'unknown';
-    responseTimeMs: number | null;
-    certDaysRemaining: number | null;
-  }[];
+  monitors: KumaMonitor[];
   up: number;
   down: number;
+  pending: number;
+  maintenance: number;
+}
+
+export interface ImmichUserUsage {
+  name: string;
+  photos: number;
+  videos: number;
+  usageBytes: number;
+  quotaBytes: number | null;
+}
+
+export interface ImmichJobQueue {
+  name: string;
+  active: number;
+  waiting: number;
+  failed: number;
+  paused: boolean;
+}
+
+export interface ImmichSummary {
+  version: string | null;
+  library: {
+    photos: number;
+    videos: number;
+    usageBytes: number;
+    users: ImmichUserUsage[];
+  } | null;
+  disk: {
+    sizeBytes: number | null;
+    usedBytes: number | null;
+    availableBytes: number | null;
+    usagePercent: number | null;
+  } | null;
+  jobs: {
+    active: number;
+    waiting: number;
+    failed: number;
+    queues: ImmichJobQueue[];
+  } | null;
 }
 
 export interface SourcesSnapshot {
   frigate: SourceResult<FrigateSummary> | null;
   jellyfin: SourceResult<JellyfinSummary> | null;
   uptimeKuma: SourceResult<KumaSummary> | null;
+  immich: SourceResult<ImmichSummary> | null;
 }
 
 export interface Snapshot {

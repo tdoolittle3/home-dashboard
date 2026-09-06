@@ -3,6 +3,8 @@ import { getText } from './http.js';
 export interface KumaMonitor {
   name: string;
   type: string | null;
+  /** What the monitor watches: a URL, or host:port, whichever Kuma labels it with. */
+  target: string | null;
   status: 'up' | 'down' | 'pending' | 'maintenance' | 'unknown';
   responseTimeMs: number | null;
   certDaysRemaining: number | null;
@@ -12,17 +14,18 @@ export interface KumaSummary {
   monitors: KumaMonitor[];
   up: number;
   down: number;
+  pending: number;
+  maintenance: number;
 }
 
 /**
  * Uptime Kuma has no documented REST API - its own UI talks socket.io. The one
  * pull-based surface is the Prometheus exporter at /metrics, authenticated with
- * an API key as the HTTP basic password (empty username).
- *
- * UNVERIFIED against the Kuma instance on 192.168.0.13:3001. If this returns
- * 401/404, check Settings -> API Keys is populated and that /metrics is enabled
- * on that version before assuming the parser is at fault. Kuma also has no
- * monitors configured yet, so an empty list is the expected result today.
+ * an API key (Settings -> API Keys) as the HTTP basic password; Kuma ignores the
+ * username. Confirmed on the 1.x instance at 192.168.0.13:3001: /metrics answers
+ * 401 without credentials, so the endpoint is there and only the key is missing.
+ * Kuma has no monitors configured yet, so an empty list is the expected result
+ * until some are added.
  */
 const STATUS_BY_CODE: Record<string, KumaMonitor['status']> = {
   '0': 'down',
@@ -30,6 +33,12 @@ const STATUS_BY_CODE: Record<string, KumaMonitor['status']> = {
   '2': 'pending',
   '3': 'maintenance',
 };
+
+/** Kuma writes the literal string "null" into labels it has no value for. */
+function label(labels: Record<string, string>, key: string): string | null {
+  const value = labels[key];
+  return value && value !== 'null' ? value : null;
+}
 
 /** Parses `metric_name{label="value",...} 1.23` lines, ignoring comments. */
 function parseMetrics(body: string): { name: string; labels: Record<string, string>; value: number }[] {
@@ -73,13 +82,16 @@ export function createUptimeKumaSource(baseUrl: string, apiKey: string) {
 
     const monitors = new Map<string, KumaMonitor>();
     const ensure = (labels: Record<string, string>): KumaMonitor | null => {
-      const name = labels['monitor_name'];
+      const name = label(labels, 'monitor_name');
       if (!name) return null;
       let monitor = monitors.get(name);
       if (!monitor) {
+        const hostname = label(labels, 'monitor_hostname');
+        const port = label(labels, 'monitor_port');
         monitor = {
           name,
-          type: labels['monitor_type'] ?? null,
+          type: label(labels, 'monitor_type'),
+          target: label(labels, 'monitor_url') ?? (hostname ? (port ? `${hostname}:${port}` : hostname) : null),
           status: 'unknown',
           responseTimeMs: null,
           certDaysRemaining: null,
@@ -103,10 +115,15 @@ export function createUptimeKumaSource(baseUrl: string, apiKey: string) {
     }
 
     const list = [...monitors.values()].sort((a, b) => a.name.localeCompare(b.name));
+    const count = (status: KumaMonitor['status']): number =>
+      list.filter((monitor) => monitor.status === status).length;
+
     return {
       monitors: list,
-      up: list.filter((monitor) => monitor.status === 'up').length,
-      down: list.filter((monitor) => monitor.status === 'down').length,
+      up: count('up'),
+      down: count('down'),
+      pending: count('pending'),
+      maintenance: count('maintenance'),
     };
   };
 }

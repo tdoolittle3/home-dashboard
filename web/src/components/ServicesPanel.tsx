@@ -1,4 +1,4 @@
-import { formatEpoch, formatNumber, formatUptime } from '../format';
+import { formatBytes, formatEpoch, formatNumber, formatUptime } from '../format';
 import type { HaStatus, SourcesSnapshot } from '../types';
 import { Panel } from './Panel';
 
@@ -25,7 +25,7 @@ function Tile({ name, ok, detail, note }: { name: string; ok: boolean | null; de
 const NOT_CONFIGURED = 'Not configured';
 
 export function ServicesPanel({ ha, sources }: ServicesPanelProps) {
-  const { frigate, jellyfin, uptimeKuma } = sources;
+  const { frigate, jellyfin, uptimeKuma, immich } = sources;
 
   const frigateDetail = frigate?.ok
     ? `${frigate.data.cameras.length} cameras · up ${formatUptime(frigate.data.uptimeSeconds)}`
@@ -34,7 +34,9 @@ export function ServicesPanel({ ha, sources }: ServicesPanelProps) {
   const detector = frigate?.ok ? frigate.data.detectors[0] : undefined;
 
   const jellyfinDetail = jellyfin?.ok
-    ? `${jellyfin.data.sessions.length} session${jellyfin.data.sessions.length === 1 ? '' : 's'}`
+    ? jellyfin.data.playing > 0
+      ? `${jellyfin.data.playing} playing · ${jellyfin.data.sessions.length} client${jellyfin.data.sessions.length === 1 ? '' : 's'}`
+      : `idle · ${jellyfin.data.sessions.length} client${jellyfin.data.sessions.length === 1 ? '' : 's'}`
     : (jellyfin?.error ?? NOT_CONFIGURED);
 
   const kumaDetail = uptimeKuma?.ok
@@ -42,6 +44,14 @@ export function ServicesPanel({ ha, sources }: ServicesPanelProps) {
       ? 'No monitors configured'
       : `${uptimeKuma.data.up} up · ${uptimeKuma.data.down} down`
     : (uptimeKuma?.error ?? NOT_CONFIGURED);
+
+  const immichDetail = immich?.ok
+    ? immich.data.library
+      ? `${formatNumber(immich.data.library.photos + immich.data.library.videos)} items · ${formatBytes(immich.data.library.usageBytes)}`
+      : (immich.data.version ?? 'connected')
+    : (immich?.error ?? NOT_CONFIGURED);
+
+  const immichJobs = immich?.ok ? immich.data.jobs : null;
 
   return (
     <Panel title="Services">
@@ -62,6 +72,14 @@ export function ServicesPanel({ ha, sources }: ServicesPanelProps) {
         />
         <Tile name="Jellyfin" ok={jellyfin ? jellyfin.ok : null} detail={jellyfinDetail} />
         <Tile name="Uptime Kuma" ok={uptimeKuma ? uptimeKuma.ok : null} detail={kumaDetail} />
+        <Tile
+          name="Immich"
+          ok={immich ? immich.ok : null}
+          detail={immichDetail}
+          {...(immichJobs && immichJobs.active + immichJobs.waiting > 0
+            ? { note: `${formatNumber(immichJobs.active)} jobs running · ${formatNumber(immichJobs.waiting)} queued` }
+            : {})}
+        />
       </div>
 
       {frigate?.ok && frigate.data.recentEvents.length > 0 ? (
@@ -83,20 +101,6 @@ export function ServicesPanel({ ha, sources }: ServicesPanelProps) {
         </>
       ) : null}
 
-      {jellyfin?.ok && jellyfin.data.sessions.length > 0 ? (
-        <>
-          <h3 className="subhead">Now playing</h3>
-          <ul className="rows rows--tight">
-            {jellyfin.data.sessions.map((session, index) => (
-              <li key={`${session.user ?? 'user'}-${index}`} className="row">
-                <span className="row__label">{session.nowPlaying ?? 'idle'}</span>
-                <span className="row__value">{session.user ?? ''}</span>
-                <span className="row__meta">{session.paused ? 'paused' : (session.client ?? '')}</span>
-              </li>
-            ))}
-          </ul>
-        </>
-      ) : null}
     </Panel>
   );
 }

@@ -38,6 +38,20 @@ export function formatMb(megabytes: number | null): string {
   return `${formatNumber(megabytes)} MB`;
 }
 
+const BYTE_UNITS = ['B', 'KB', 'MB', 'GB', 'TB'];
+
+/** Binary units, one decimal past megabytes, matching how Immich and Jellyfin show sizes. */
+export function formatBytes(bytes: number | null): string {
+  if (bytes === null || !Number.isFinite(bytes) || bytes < 0) return '-';
+  let value = bytes;
+  let unit = 0;
+  while (value >= 1024 && unit < BYTE_UNITS.length - 1) {
+    value /= 1024;
+    unit += 1;
+  }
+  return `${unit < 2 ? Math.round(value).toLocaleString() : formatNumber(value)} ${BYTE_UNITS[unit]}`;
+}
+
 export function formatUptime(seconds: number | null): string {
   if (seconds === null) return '-';
   const days = Math.floor(seconds / 86_400);
