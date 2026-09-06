@@ -41,7 +41,7 @@ The server also:
 - enforces a **write allowlist** — `/api/action` refuses any entity not listed in a `controls`
   panel in `config/dashboard.json`. A compromised page cannot call arbitrary HA services.
 
-**The dashboard itself has no login.** Anyone who can reach port 8099 can read every panel and
+**The dashboard itself has no login.** Anyone who can reach it can read every panel and
 toggle the allowlisted entities. That is the same trust level as Frigate's unauthenticated API
 already on that LAN — but it means this must stay behind Tailscale/LAN and must never be
 port-forwarded.
@@ -126,7 +126,8 @@ Entity ids come from HA → Developer tools → States. The defaults use the sto
 
 ## Deploying to ladybird
 
-**Deployed and running** at <http://192.168.0.13:8099> since 2026-09-05.
+**Deployed and running** at <http://ladybird/> (also <http://192.168.0.13/>) since 2026-09-05, and
+published on port **80** since 2026-09-06 so the bare hostname is enough.
 
 The root `docker-compose.yml` here is for local testing only. On the server the deployment lives in
 `home-automation` under `stacks/dash/`, so every compose file for that host stays in one repo — see
@@ -158,6 +159,14 @@ checkout does not stop the container; it only prevents the next rebuild.
 
 `docker compose restart` does **not** reload `.env`. After changing a token use
 `docker compose up -d --force-recreate`.
+
+### Ports
+
+Inside the container the server listens on `8099` (`PORT` in `.env.example`) and runs as the
+non-root `node` user, which cannot bind ports below 1024. The host publishes that as port **80** —
+the `"80:8099"` mapping in the compose file — so `http://ladybird/` needs no port number. Nothing
+else on the host listens on 80. The name resolves through Tailscale MagicDNS on tailnet devices;
+on the LAN without Tailscale use `http://ladybird.local/` (mDNS) or the IP.
 
 ---
 

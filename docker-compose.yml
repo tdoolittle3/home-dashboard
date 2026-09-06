@@ -9,7 +9,10 @@ services:
     restart: unless-stopped
     env_file: .env
     ports:
-      - "8099:8099"
+      # Same mapping as the deployed stack: the app listens on 8099 inside the
+      # container (it runs as the non-root `node` user, which cannot bind 80)
+      # and the host publishes it on the default http port.
+      - "80:8099"
     volumes:
       # Edit panels without rebuilding the image; restart to pick them up.
       - ./config/dashboard.json:/app/config/dashboard.json:ro
