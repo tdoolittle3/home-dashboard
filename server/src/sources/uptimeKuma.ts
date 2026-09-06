@@ -108,9 +108,10 @@ export function createUptimeKumaSource(baseUrl: string, apiKey: string) {
       if (sample.name === 'monitor_status') {
         monitor.status = STATUS_BY_CODE[String(sample.value)] ?? 'unknown';
       } else if (sample.name === 'monitor_response_time') {
-        monitor.responseTimeMs = sample.value;
+        // Group monitors and anything that has not been checked report -1 for "no figure".
+        monitor.responseTimeMs = sample.value >= 0 ? sample.value : null;
       } else if (sample.name === 'monitor_cert_days_remaining') {
-        monitor.certDaysRemaining = sample.value;
+        monitor.certDaysRemaining = sample.value >= 0 ? sample.value : null;
       }
     }
 
