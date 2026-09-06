@@ -7,12 +7,13 @@ interface ServicesPanelProps {
   sources: SourcesSnapshot;
 }
 
+/** `ok` null means the service is not configured - a resting state, not a fault. */
 function Tile({ name, ok, detail, note }: { name: string; ok: boolean | null; detail: string; note?: string }) {
-  const status = ok === null ? 'tile__dot--idle' : ok ? 'tile__dot--up' : 'tile__dot--down';
+  const state = ok === null ? 'idle' : ok ? 'up' : 'down';
   return (
-    <div className="tile">
+    <div className={`tile tile--${state}`}>
       <div className="tile__head">
-        <span className={`tile__dot ${status}`} aria-hidden="true" />
+        <span className={`tile__dot tile__dot--${state}`} aria-hidden="true" />
         <span className="tile__name">{name}</span>
       </div>
       <div className="tile__detail">{detail}</div>
@@ -21,24 +22,26 @@ function Tile({ name, ok, detail, note }: { name: string; ok: boolean | null; de
   );
 }
 
+const NOT_CONFIGURED = 'Not configured';
+
 export function ServicesPanel({ ha, sources }: ServicesPanelProps) {
   const { frigate, jellyfin, uptimeKuma } = sources;
 
   const frigateDetail = frigate?.ok
-    ? `${frigate.data.cameras.length} cameras - up ${formatUptime(frigate.data.uptimeSeconds)}`
-    : (frigate?.error ?? 'not configured');
+    ? `${frigate.data.cameras.length} cameras · up ${formatUptime(frigate.data.uptimeSeconds)}`
+    : (frigate?.error ?? NOT_CONFIGURED);
 
   const detector = frigate?.ok ? frigate.data.detectors[0] : undefined;
 
   const jellyfinDetail = jellyfin?.ok
     ? `${jellyfin.data.sessions.length} session${jellyfin.data.sessions.length === 1 ? '' : 's'}`
-    : (jellyfin?.error ?? 'not configured');
+    : (jellyfin?.error ?? NOT_CONFIGURED);
 
   const kumaDetail = uptimeKuma?.ok
     ? uptimeKuma.data.monitors.length === 0
-      ? 'no monitors configured'
-      : `${uptimeKuma.data.up} up / ${uptimeKuma.data.down} down`
-    : (uptimeKuma?.error ?? 'not configured');
+      ? 'No monitors configured'
+      : `${uptimeKuma.data.up} up · ${uptimeKuma.data.down} down`
+    : (uptimeKuma?.error ?? NOT_CONFIGURED);
 
   return (
     <Panel title="Services">
@@ -68,7 +71,7 @@ export function ServicesPanel({ ha, sources }: ServicesPanelProps) {
             {frigate.data.recentEvents.slice(0, 5).map((event) => (
               <li key={event.id} className="row">
                 <span className="row__label">
-                  {event.label} - {event.camera}
+                  {event.label} · {event.camera}
                 </span>
                 <span className="row__value">
                   {event.score === null ? '' : `${Math.round(event.score * 100)}%`}

@@ -16,8 +16,10 @@ interface Slice {
   megabytes: number;
 }
 
-const SIZE = 132;
-const RADIUS = 62;
+const SIZE = 168;
+const RADIUS = 80;
+/** Radius of the hole the headline figure sits in. */
+const HOLE = 55;
 const CENTER = SIZE / 2;
 
 /** A reserved remainder smaller than this reads as a rendering artefact, not data. */
@@ -61,13 +63,22 @@ function wedgePath(start: number, end: number): string {
 }
 
 /**
- * Part-to-whole for one filesystem.
+ * Part-to-whole for one filesystem, drawn as a ring with the used share as the
+ * headline figure in the middle.
  *
  * ext4 holds back about 5% of the disk for root, so `used + free` lands short of
  * the reported size - on ladybird's drive by roughly 23 GB. That gap is shown as
  * its own slice rather than absorbed into the free wedge, which would draw free
  * larger than its own label claims. Percentages are taken against the sum of the
- * slices actually drawn, so the geometry and the labels cannot disagree.
+ * slices actually drawn, so the geometry and the labels cannot disagree; the
+ * headline is the same share rounded to a whole number, and the legend keeps
+ * the decimal.
+ *
+ * The wedges are full sectors from the centre; the hole is a surface-coloured
+ * disc laid over them. The geometry underneath is still a pie that sums to 100%.
+ *
+ * Fills are --chart-used / --chart-free / --chart-reserved, validated together
+ * against --surface with the dataviz validator in dark mode, all pairs.
  */
 export function DiskPie({ mount, alsoServes = [], totalMb, usedMb, freeMb }: DiskPieProps) {
   const slices: Slice[] = [
@@ -91,6 +102,8 @@ export function DiskPie({ mount, alsoServes = [], totalMb, usedMb, freeMb }: Dis
     return { slice, start, end: slice === slices[slices.length - 1] ? 1 : cursor };
   });
 
+  const usedPercent = Math.round(share(slices[0]?.megabytes ?? 0) * 100);
+
   const summary = [
     `${mount}:`,
     ...slices.map((slice) => `${slice.label} ${formatMb(slice.megabytes)}`),
@@ -99,43 +112,49 @@ export function DiskPie({ mount, alsoServes = [], totalMb, usedMb, freeMb }: Dis
 
   return (
     <div className="disk">
-      <svg
-        className="disk__chart"
-        viewBox={`0 0 ${SIZE} ${SIZE}`}
-        width={SIZE}
-        height={SIZE}
-        role="img"
-        aria-label={summary}
-      >
-        {/* Slices carry a 2px stroke in the surface colour: that is the gap
-            between them, not an outline drawn around them. */}
-        {wedges.map(({ slice, start, end }) => (
-          <path
-            key={slice.key}
-            className={`disk__slice disk__slice--${slice.key}`}
-            d={wedgePath(start, end)}
-          >
-            <title>{`${slice.label} ${formatMb(slice.megabytes)} (${formatNumber(share(slice.megabytes) * 100)}%)`}</title>
-          </path>
-        ))}
-      </svg>
+      <div className="disk__row">
+        <div className="disk__chart">
+          <svg viewBox={`0 0 ${SIZE} ${SIZE}`} width={SIZE} height={SIZE} role="img" aria-label={summary}>
+            {/* Slices carry a 2px stroke in the surface colour: that is the gap
+                between them, not an outline drawn around them. */}
+            {wedges.map(({ slice, start, end }) => (
+              <path
+                key={slice.key}
+                className={`disk__slice disk__slice--${slice.key}`}
+                d={wedgePath(start, end)}
+              >
+                <title>{`${slice.label} ${formatMb(slice.megabytes)} (${formatNumber(share(slice.megabytes) * 100)}%)`}</title>
+              </path>
+            ))}
+            <circle className="disk__hole" cx={CENTER} cy={CENTER} r={HOLE} />
+          </svg>
+          <div className="disk__hero">
+            <div className="disk__hero-value">
+              {usedPercent}
+              <span className="disk__hero-unit">%</span>
+            </div>
+            <div className="disk__hero-label">used</div>
+          </div>
+        </div>
 
-      <div className="disk__side">
-        <ul className="disk__legend">
-          {slices.map((slice) => (
-            <li key={slice.key} className="disk__key">
-              <span className={`disk__swatch disk__swatch--${slice.key}`} aria-hidden="true" />
-              <span className="disk__key-label">{slice.label}</span>
-              <span className="disk__key-value">{formatMb(slice.megabytes)}</span>
-              <span className="disk__key-pct">{formatNumber(share(slice.megabytes) * 100)}%</span>
-            </li>
-          ))}
-        </ul>
-        <p className="disk__caption">
-          {[mount, ...alsoServes].join(', ')}
-          <span className="disk__caption-extra"> · {formatMb(totalMb)} total</span>
-        </p>
+        <div className="disk__side">
+          <ul className="disk__legend">
+            {slices.map((slice) => (
+              <li key={slice.key} className="disk__key">
+                <span className={`disk__swatch disk__swatch--${slice.key}`} aria-hidden="true" />
+                <span className="disk__key-label">{slice.label}</span>
+                <span className="disk__key-value">{formatMb(slice.megabytes)}</span>
+                <span className="disk__key-pct">{formatNumber(share(slice.megabytes) * 100)}%</span>
+              </li>
+            ))}
+          </ul>
+        </div>
       </div>
+
+      <p className="disk__caption">
+        {[mount, ...alsoServes].join(', ')}
+        <span className="disk__caption-extra"> · {formatMb(totalMb)} total</span>
+      </p>
     </div>
   );
 }

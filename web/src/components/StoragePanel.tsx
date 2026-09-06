@@ -14,7 +14,8 @@ interface StoragePanelProps {
 /**
  * The disk chart and Home Assistant's storage sensors in one panel: the two
  * describe the same drive from different angles, so splitting them across the
- * page made the reader hold both halves in their head.
+ * page made the reader hold both halves in their head. When the panel is wide
+ * enough the chart sits beside the sensor rows; on a phone they stack.
  *
  * Frigate's figures come from inside its container and HA's from the host, so
  * the two disagree slightly - HA counts the root filesystem where Frigate counts
@@ -26,46 +27,54 @@ export function StoragePanel({ title, refs, entities, frigate }: StoragePanelPro
 
   return (
     <Panel title={title}>
-      {disk ? (
-        <DiskPie
-          mount={disk.mount}
-          alsoServes={disk.alsoServes}
-          totalMb={disk.totalMb}
-          usedMb={disk.usedMb}
-          freeMb={disk.freeMb}
-        />
-      ) : null}
+      <div className="storage">
+        <div className={disk ? 'storage__grid storage__grid--pair' : 'storage__grid'}>
+          {disk ? (
+            <div className="storage__lead">
+              <DiskPie
+                mount={disk.mount}
+                alsoServes={disk.alsoServes}
+                totalMb={disk.totalMb}
+                usedMb={disk.usedMb}
+                freeMb={disk.freeMb}
+              />
+            </div>
+          ) : null}
 
-      <h3 className="subhead">Storage guard</h3>
-      <ul className="rows">
-        {refs.map((ref) => {
-          const entity = entities[ref.entity_id];
-          return (
-            <li key={ref.entity_id} className="row">
-              <span className="row__label">{labelFor(ref, entity)}</span>
-              <span className={isProblem(entity) ? 'row__value row__value--alert' : 'row__value'}>
-                {formatState(entity)}
-              </span>
-              <span className="row__meta">{formatRelative(entity?.lastChanged ?? null)}</span>
-            </li>
-          );
-        })}
-      </ul>
+          <div className="storage__detail">
+            <h3 className="subhead">Storage guard</h3>
+            <ul className="rows">
+              {refs.map((ref) => {
+                const entity = entities[ref.entity_id];
+                return (
+                  <li key={ref.entity_id} className="row">
+                    <span className="row__label">{labelFor(ref, entity)}</span>
+                    <span className={isProblem(entity) ? 'row__value row__value--alert' : 'row__value'}>
+                      {formatState(entity)}
+                    </span>
+                    <span className="row__meta">{formatRelative(entity?.lastChanged ?? null)}</span>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        </div>
 
-      {others.length > 0 ? (
-        <>
-          <h3 className="subhead">Other mounts</h3>
-          <ul className="rows rows--tight">
-            {others.map((group) => (
-              <li key={group.mount} className="row">
-                <span className="row__label">{[group.mount, ...group.alsoServes].join(', ')}</span>
-                <span className="row__value">{formatMb(group.usedMb)} used</span>
-                <span className="row__meta">{formatMb(group.freeMb)} free</span>
-              </li>
-            ))}
-          </ul>
-        </>
-      ) : null}
+        {others.length > 0 ? (
+          <>
+            <h3 className="subhead">Other mounts</h3>
+            <ul className="rows rows--tight">
+              {others.map((group) => (
+                <li key={group.mount} className="row">
+                  <span className="row__label">{[group.mount, ...group.alsoServes].join(', ')}</span>
+                  <span className="row__value">{formatMb(group.usedMb)} used</span>
+                  <span className="row__meta">{formatMb(group.freeMb)} free</span>
+                </li>
+              ))}
+            </ul>
+          </>
+        ) : null}
+      </div>
     </Panel>
   );
 }
