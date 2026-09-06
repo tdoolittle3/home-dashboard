@@ -583,11 +583,12 @@ body {
   margin-bottom: 16px;
 }
 
-/* Wider minimum than the grid's panels, so a camera gets a real amount of
-   space before the row wraps to one column. */
+/* Wider minimum than the grid's panels so a camera gets real space, but low
+   enough that two still sit side by side on a laptop - stacking them pushes the
+   rest of the dashboard off the screen entirely. */
 .hero .cameras {
   gap: 14px;
-  grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
 }
 
 .hero .camera figcaption {
