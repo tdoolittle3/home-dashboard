@@ -36,7 +36,7 @@ export function ControlsPanel({ title, refs, entities }: ControlsPanelProps) {
           const on = isOn(entity);
           const busy = pending[ref.entity_id] === true;
           return (
-            <li key={ref.entity_id} className="row">
+            <li key={ref.entity_id} className="row row--control">
               <span className="row__label">{labelFor(ref, entity)}</span>
               <span className="row__meta">{busy ? 'switching…' : formatState(entity)}</span>
               {/* role="switch" rather than a pressed button: this reports a state

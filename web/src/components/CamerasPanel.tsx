@@ -27,7 +27,7 @@ export function CamerasPanel({ title, cameras, refreshSeconds, stillHeight = 360
   }, [refreshSeconds]);
 
   return (
-    <Panel title={title}>
+    <Panel title={title} aside={`refreshes every ${refreshSeconds}s`}>
       <div className="cameras">
         {cameras.map((camera, index) => (
           <figure key={camera.name} className="camera">
@@ -49,7 +49,14 @@ export function CamerasPanel({ title, cameras, refreshSeconds, stillHeight = 360
                 ⤢
               </span>
             </button>
-            <figcaption>{camera.label ?? camera.name}</figcaption>
+            {/* The caption is laid over the still rather than set beneath it, so
+                the name and the picture read as one object. It sits outside the
+                button because a button may only contain phrasing content, and it
+                ignores the pointer so clicks still reach the button. */}
+            <figcaption className="camera__caption">
+              <span className="camera__live" aria-hidden="true" />
+              {camera.label ?? camera.name}
+            </figcaption>
           </figure>
         ))}
       </div>
