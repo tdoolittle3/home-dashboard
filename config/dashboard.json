@@ -2,7 +2,9 @@
   "title": "ladybird",
   "notes": [
     "Edit this file and restart the server - no rebuild needed. It is mounted read-only in Docker.",
+    "Panel order here is the order they render. The first 'cameras' panel is the hero row at the top.",
     "Panels of type 'controls' double as the write allowlist: /api/action refuses any entity not listed here.",
+    "An 'entities' panel with \"chart\": \"disk\" also draws the largest filesystem Frigate reports.",
     "Find entity ids in Home Assistant under Developer tools -> States."
   ],
   "panels": [
@@ -17,23 +19,24 @@
       ]
     },
     {
-      "id": "controls",
-      "title": "Controls",
-      "type": "controls",
-      "entities": [
-        { "entity_id": "switch.frontcam_white_light", "name": "Driveway white light" }
-      ]
-    },
-    {
       "id": "storage",
-      "title": "Storage guard",
+      "title": "Storage",
       "type": "entities",
+      "chart": "disk",
       "entities": [
         { "entity_id": "binary_sensor.ladybird_storage_storage_problem", "name": "Storage problem" },
         { "entity_id": "sensor.ladybird_storage_disk_used", "name": "Disk used" },
         { "entity_id": "sensor.ladybird_storage_disk_free", "name": "Disk free" },
         { "entity_id": "sensor.ladybird_storage_frigate_recordings", "name": "Frigate recordings" },
         { "entity_id": "sensor.ladybird_storage_media_library", "name": "Media library" }
+      ]
+    },
+    {
+      "id": "controls",
+      "title": "Controls",
+      "type": "controls",
+      "entities": [
+        { "entity_id": "switch.frontcam_white_light", "name": "Driveway white light" }
       ]
     }
   ],

@@ -38,15 +38,22 @@ export function ControlsPanel({ title, refs, entities }: ControlsPanelProps) {
           return (
             <li key={ref.entity_id} className="row">
               <span className="row__label">{labelFor(ref, entity)}</span>
-              <span className="row__value">{formatState(entity)}</span>
+              <span className="row__meta">{busy ? 'switching…' : formatState(entity)}</span>
+              {/* role="switch" rather than a pressed button: this reports a state
+                  that stays changed, not a momentary press. */}
               <button
                 type="button"
-                className={on ? 'toggle toggle--on' : 'toggle'}
+                role="switch"
+                className={on ? 'switch switch--on' : 'switch'}
                 disabled={busy || entity?.missing !== false}
-                aria-pressed={on}
+                aria-checked={on}
+                aria-label={labelFor(ref, entity)}
                 onClick={() => void toggle(ref.entity_id)}
               >
-                {busy ? '...' : on ? 'On' : 'Off'}
+                <span className="switch__track" aria-hidden="true">
+                  <span className="switch__knob" />
+                </span>
+                <span className="switch__text">{on ? 'On' : 'Off'}</span>
               </button>
             </li>
           );

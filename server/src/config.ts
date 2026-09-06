@@ -13,7 +13,14 @@ export interface CameraRef {
 }
 
 export type Panel =
-  | { id: string; title: string; type: 'entities'; entities: EntityRef[] }
+  | {
+      id: string;
+      title: string;
+      type: 'entities';
+      entities: EntityRef[];
+      /** Draw the largest filesystem Frigate reports above the rows. */
+      chart?: 'disk';
+    }
   | { id: string; title: string; type: 'controls'; entities: EntityRef[] }
   | { id: string; title: string; type: 'cameras'; cameras: CameraRef[]; refreshSeconds?: number };
 
@@ -83,6 +90,11 @@ function loadDashboard(path: string): DashboardConfig {
         if (!/^[a-z_]+\.[a-z0-9_]+$/.test(entity.entity_id ?? '')) {
           throw new Error(`${path}: panel "${panel.id}" has an invalid entity_id: ${entity.entity_id}`);
         }
+      }
+      if (panel.type === 'entities' && panel.chart !== undefined && panel.chart !== 'disk') {
+        throw new Error(
+          `${path}: panel "${panel.id}" has unknown chart "${panel.chart}" - the only chart is "disk"`,
+        );
       }
     } else if (panel.type === 'cameras') {
       if (!Array.isArray(panel.cameras) || panel.cameras.length === 0) {

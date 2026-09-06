@@ -7,6 +7,9 @@ interface CamerasPanelProps {
   title: string;
   cameras: CameraRef[];
   refreshSeconds: number;
+  /** Height to request from the proxy. The hero row renders large enough that
+      the old 360px default looked soft on a wide screen. */
+  stillHeight?: number;
 }
 
 /**
@@ -14,7 +17,7 @@ interface CamerasPanelProps {
  * A still every few seconds costs the detector nothing; MJPEG or WebRTC per open
  * tab does not. Swapping in go2rtc/WebRTC later only changes this component.
  */
-export function CamerasPanel({ title, cameras, refreshSeconds }: CamerasPanelProps) {
+export function CamerasPanel({ title, cameras, refreshSeconds, stillHeight = 360 }: CamerasPanelProps) {
   const [tick, setTick] = useState(() => Date.now());
   const [viewing, setViewing] = useState<number | null>(null);
 
@@ -38,7 +41,7 @@ export function CamerasPanel({ title, cameras, refreshSeconds }: CamerasPanelPro
             >
               <img
                 // The cache-buster is what actually forces the refresh.
-                src={`/api/camera/${camera.name}/snapshot?h=360&t=${tick}`}
+                src={`/api/camera/${camera.name}/snapshot?h=${stillHeight}&t=${tick}`}
                 alt={`Latest still from ${camera.label ?? camera.name}`}
                 loading="lazy"
               />
