@@ -12,6 +12,43 @@ interface CameraViewerProps {
 /** How long a dropped stream stays on its fallback still before reconnecting. */
 const STREAM_RETRY_MS = 5_000;
 
+/*
+ * The Fullscreen API is uneven on mobile: iPhone Safari does not offer it for
+ * anything but <video> (and the stream here is an <img>), and older WebKit and
+ * Android browsers only ship it with the webkit prefix. So every call goes
+ * through these helpers, and where no variant exists the button is not shown -
+ * the overlay already fills the viewport there.
+ */
+interface WebkitElement extends HTMLElement {
+  webkitRequestFullscreen?: () => Promise<void> | void;
+}
+
+interface WebkitDocument extends Document {
+  webkitFullscreenEnabled?: boolean;
+  webkitFullscreenElement?: Element | null;
+  webkitExitFullscreen?: () => Promise<void> | void;
+}
+
+const doc = document as WebkitDocument;
+
+const FULLSCREEN_SUPPORTED = document.fullscreenEnabled || doc.webkitFullscreenEnabled === true;
+
+function currentFullscreenElement(): Element | null {
+  return document.fullscreenElement ?? doc.webkitFullscreenElement ?? null;
+}
+
+function requestFullscreenOn(node: HTMLElement): void {
+  const target = node as WebkitElement;
+  const request = target.requestFullscreen?.bind(target) ?? target.webkitRequestFullscreen?.bind(target);
+  // Refused in some embedded contexts; the overlay still stands on its own.
+  void Promise.resolve(request?.()).catch(() => undefined);
+}
+
+function exitFullscreen(): void {
+  const exit = document.exitFullscreen?.bind(document) ?? doc.webkitExitFullscreen?.bind(doc);
+  void Promise.resolve(exit?.()).catch(() => undefined);
+}
+
 /**
  * Full-screen live viewer. The panel thumbnails stay cheap polled stills; only
  * here, where someone is actually watching, does the MJPEG stream run - Frigate
@@ -97,10 +134,15 @@ export function CameraViewer({ cameras, index, onSelect, onClose }: CameraViewer
 
   // Browser fullscreen can also be left with F11 or the platform's own Escape
   // handling, so mirror the document's state rather than tracking our own.
+  // Prefixed WebKit fires webkitfullscreenchange instead of the standard event.
   useEffect(() => {
-    const sync = () => setIsFullscreen(document.fullscreenElement === overlayRef.current);
+    const sync = () => setIsFullscreen(currentFullscreenElement() === overlayRef.current);
     document.addEventListener('fullscreenchange', sync);
-    return () => document.removeEventListener('fullscreenchange', sync);
+    document.addEventListener('webkitfullscreenchange', sync);
+    return () => {
+      document.removeEventListener('fullscreenchange', sync);
+      document.removeEventListener('webkitfullscreenchange', sync);
+    };
   }, []);
 
   useEffect(() => {
@@ -108,7 +150,7 @@ export function CameraViewer({ cameras, index, onSelect, onClose }: CameraViewer
       if (event.key === 'Escape') {
         // While in browser fullscreen the first Escape exits that; let the
         // browser handle it and keep the overlay open.
-        if (document.fullscreenElement) return;
+        if (currentFullscreenElement()) return;
         event.preventDefault();
         onClose();
       } else if (event.key === 'ArrowRight') {
@@ -132,11 +174,10 @@ export function CameraViewer({ cameras, index, onSelect, onClose }: CameraViewer
   const toggleFullscreen = useCallback(() => {
     const node = overlayRef.current;
     if (!node) return;
-    if (document.fullscreenElement) {
-      void document.exitFullscreen();
+    if (currentFullscreenElement()) {
+      exitFullscreen();
     } else {
-      // Refused in some embedded contexts; the overlay still stands on its own.
-      void node.requestFullscreen().catch(() => undefined);
+      requestFullscreenOn(node);
     }
   }, []);
 
@@ -187,9 +228,11 @@ export function CameraViewer({ cameras, index, onSelect, onClose }: CameraViewer
           <button type="button" className="viewer__btn" onClick={refreshNow}>
             Reconnect
           </button>
-          <button type="button" className="viewer__btn" onClick={toggleFullscreen} aria-pressed={isFullscreen}>
-            {isFullscreen ? 'Exit full screen' : 'Full screen'}
-          </button>
+          {FULLSCREEN_SUPPORTED ? (
+            <button type="button" className="viewer__btn" onClick={toggleFullscreen} aria-pressed={isFullscreen}>
+              {isFullscreen ? 'Exit full screen' : 'Full screen'}
+            </button>
+          ) : null}
           <button type="button" className="viewer__btn viewer__btn--close" onClick={onClose} ref={closeRef}>
             Close
           </button>
