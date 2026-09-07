@@ -3,6 +3,7 @@ import { ControlsPanel } from './components/ControlsPanel';
 import { EntitiesPanel } from './components/EntitiesPanel';
 import { ServicesPanel } from './components/ServicesPanel';
 import { StoragePanel } from './components/StoragePanel';
+import { SystemPanel } from './components/SystemPanel';
 import { formatRelative } from './format';
 import type { Panel } from './types';
 import { useDashboard } from './useDashboard';
@@ -38,7 +39,7 @@ export function App() {
   const { dashboard, entities, sources, ha } = snapshot;
 
   // Cameras lead the page in a full-width row of their own. Below it the page
-  // splits into a wide main column (storage and any other entity panels) and a
+  // splits into a wide main column (system, storage and any other entity panels) and a
   // narrower side stack (controls, then services), each in the order
   // config/dashboard.json lists them. The side stack comes first in the DOM so
   // that on a phone, where the columns collapse, the switches sit right under
@@ -61,6 +62,9 @@ export function App() {
     }
     if (panel.type === 'controls') {
       return <ControlsPanel key={panel.id} title={panel.title} refs={panel.entities} entities={entities} />;
+    }
+    if (panel.type === 'system') {
+      return <SystemPanel key={panel.id} title={panel.title} metrics={panel.metrics} entities={entities} />;
     }
     if (panel.chart === 'disk') {
       return (

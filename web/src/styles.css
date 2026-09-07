@@ -20,6 +20,7 @@
   --text-dim: #9aa3b4;
   --accent: #5aa9e6;
   --up: #4bbf82;
+  --warn: #d9a441;
   --down: #e5646e;
   --idle: #6b7280;
   /* Text and scrim that sit on top of camera stills, whatever their content. */
@@ -757,6 +758,137 @@ body {
   .storage__grid--pair .storage__lead {
     padding-top: 6px;
   }
+}
+
+/* --- system panel: uptime headline over a grid of hardware readings --- */
+
+.system {
+  display: grid;
+  gap: 14px;
+}
+
+.system__hero {
+  display: grid;
+  gap: 2px;
+  padding: 4px 0 8px;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+}
+
+.system__hero-label {
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--text-dim);
+}
+
+/* Proportional figures, as in the disk donut: one big number, not a column. */
+.system__hero-value {
+  font-size: var(--fs-hero);
+  font-weight: 650;
+  letter-spacing: -0.03em;
+  line-height: 1.05;
+}
+
+.system__hero--off .system__hero-value {
+  font-size: var(--fs-xl);
+  font-weight: 500;
+  color: var(--text-dim);
+}
+
+.system__hero-note {
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+  min-height: 1.2em;
+}
+
+.stats {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(min(128px, 100%), 1fr));
+}
+
+.stat {
+  display: grid;
+  gap: 4px;
+  align-content: start;
+  padding: 10px 12px 11px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-raised);
+  transition: border-color var(--motion-fast) var(--ease);
+}
+
+.stat__label {
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+  overflow-wrap: anywhere;
+}
+
+.stat__value {
+  font-size: var(--fs-xl);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+.stat__unit {
+  margin-left: 3px;
+  font-size: var(--fs-sm);
+  font-weight: 500;
+  color: var(--text-dim);
+}
+
+.stat__bar {
+  display: block;
+  height: 4px;
+  margin-top: 4px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text) 8%, transparent);
+  overflow: hidden;
+}
+
+.stat__fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  transition: width var(--motion-base) var(--ease);
+}
+
+/* Warnings tint the figure and bar; a fault also tints the edge so it reads
+   from across the room. Missing or unavailable readings drop to grey text. */
+.stat--warn .stat__value,
+.stat--warn .stat__fill {
+  color: var(--warn);
+  background: var(--warn);
+}
+
+.stat--warn .stat__value {
+  background: none;
+}
+
+.stat--crit {
+  border-color: color-mix(in srgb, var(--down) 45%, var(--border));
+}
+
+.stat--crit .stat__value {
+  color: var(--down);
+}
+
+.stat--crit .stat__fill {
+  background: var(--down);
+}
+
+.stat--off .stat__value {
+  font-size: var(--fs-md);
+  font-weight: 500;
+  color: var(--text-dim);
 }
 
 /* --- camera thumbnails open the viewer --- */

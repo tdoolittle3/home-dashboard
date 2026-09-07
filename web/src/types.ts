@@ -30,6 +30,14 @@ export interface CameraRef {
   label?: string;
 }
 
+export type SystemMetricKind = 'uptime' | 'percent' | 'value';
+
+export interface SystemMetricRef extends EntityRef {
+  kind?: SystemMetricKind;
+  warn?: number;
+  crit?: number;
+}
+
 export type Panel =
   | {
       id: string;
@@ -40,7 +48,8 @@ export type Panel =
       chart?: 'disk';
     }
   | { id: string; title: string; type: 'controls'; entities: EntityRef[] }
-  | { id: string; title: string; type: 'cameras'; cameras: CameraRef[]; refreshSeconds?: number };
+  | { id: string; title: string; type: 'cameras'; cameras: CameraRef[]; refreshSeconds?: number }
+  | { id: string; title: string; type: 'system'; metrics: SystemMetricRef[] };
 
 export interface DashboardConfig {
   title: string;
