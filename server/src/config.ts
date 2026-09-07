@@ -12,6 +12,21 @@ export interface CameraRef {
   label?: string;
 }
 
+/**
+ * How a system metric is drawn. Left out, it is inferred from the entity: a
+ * `timestamp` sensor is an uptime (time since that instant), a `%` sensor is a
+ * gauge, anything else is a plain figure with its unit.
+ */
+export type SystemMetricKind = 'uptime' | 'percent' | 'value';
+
+export interface SystemMetricRef extends EntityRef {
+  kind?: SystemMetricKind;
+  /** Reading at or above this colours the metric as a warning. */
+  warn?: number;
+  /** Reading at or above this colours the metric as a fault. */
+  crit?: number;
+}
+
 export type Panel =
   | {
       id: string;
@@ -23,7 +38,14 @@ export type Panel =
     }
   | { id: string; title: string; type: 'controls'; entities: EntityRef[] }
   | { id: string; title: string; type: 'cameras'; cameras: CameraRef[]; refreshSeconds?: number }
-  | { id: string; title: string; type: 'service'; service: ServiceName };
+  | { id: string; title: string; type: 'service'; service: ServiceName }
+  | {
+      id: string;
+      title: string;
+      type: 'system';
+      /** Host uptime and hardware readings, drawn as stat tiles rather than rows. */
+      metrics: SystemMetricRef[];
+    };
 
 /** Polled services that get a panel of their own. Each needs its `*_BASE_URL` and key in .env. */
 export const SERVICE_NAMES = ['uptimeKuma', 'jellyfin', 'immich'] as const;
@@ -77,6 +99,9 @@ function stripTrailingSlash(url: string): string {
   return url.replace(/\/+$/, '');
 }
 
+const ENTITY_ID = /^[a-z_]+\.[a-z0-9_]+$/;
+const METRIC_KINDS = new Set<string>(['uptime', 'percent', 'value']);
+
 function loadDashboard(path: string): DashboardConfig {
   const raw = readFileSync(resolve(path), 'utf8');
   const parsed = JSON.parse(raw) as Partial<DashboardConfig>;
@@ -93,7 +118,7 @@ function loadDashboard(path: string): DashboardConfig {
         throw new Error(`${path}: panel "${panel.id}" needs a non-empty "entities" array`);
       }
       for (const entity of panel.entities) {
-        if (!/^[a-z_]+\.[a-z0-9_]+$/.test(entity.entity_id ?? '')) {
+        if (!ENTITY_ID.test(entity.entity_id ?? '')) {
           throw new Error(`${path}: panel "${panel.id}" has an invalid entity_id: ${entity.entity_id}`);
         }
       }
@@ -101,6 +126,29 @@ function loadDashboard(path: string): DashboardConfig {
         throw new Error(
           `${path}: panel "${panel.id}" has unknown chart "${panel.chart}" - the only chart is "disk"`,
         );
+      }
+    } else if (panel.type === 'system') {
+      if (!Array.isArray(panel.metrics) || panel.metrics.length === 0) {
+        throw new Error(`${path}: panel "${panel.id}" needs a non-empty "metrics" array`);
+      }
+      for (const metric of panel.metrics) {
+        if (!ENTITY_ID.test(metric.entity_id ?? '')) {
+          throw new Error(`${path}: panel "${panel.id}" has an invalid entity_id: ${metric.entity_id}`);
+        }
+        if (metric.kind !== undefined && !METRIC_KINDS.has(metric.kind)) {
+          throw new Error(
+            `${path}: metric ${metric.entity_id} has unknown kind "${metric.kind}" - use ${[...METRIC_KINDS].join(', ')}`,
+          );
+        }
+        for (const key of ['warn', 'crit'] as const) {
+          const value = metric[key];
+          if (value !== undefined && (typeof value !== 'number' || !Number.isFinite(value))) {
+            throw new Error(`${path}: metric ${metric.entity_id} has a non-numeric "${key}"`);
+          }
+        }
+        if (metric.warn !== undefined && metric.crit !== undefined && metric.warn > metric.crit) {
+          throw new Error(`${path}: metric ${metric.entity_id} has "warn" above "crit"`);
+        }
       }
     } else if (panel.type === 'cameras') {
       if (!Array.isArray(panel.cameras) || panel.cameras.length === 0) {
@@ -140,13 +188,25 @@ export function loadConfig(): AppConfig {
   const cameras = new Set<string>();
 
   for (const panel of dashboard.panels) {
-    if (panel.type === 'entities' || panel.type === 'controls') {
-      for (const entity of panel.entities) watched.add(entity.entity_id);
-      if (panel.type === 'controls') {
-        for (const entity of panel.entities) controllable.add(entity.entity_id);
-      }
-    } else if (panel.type === 'cameras') {
-      for (const camera of panel.cameras) cameras.add(camera.name);
+    switch (panel.type) {
+      case 'entities':
+        for (const entity of panel.entities) watched.add(entity.entity_id);
+        break;
+      case 'controls':
+        for (const entity of panel.entities) {
+          watched.add(entity.entity_id);
+          controllable.add(entity.entity_id);
+        }
+        break;
+      case 'system':
+        for (const metric of panel.metrics) watched.add(metric.entity_id);
+        break;
+      case 'cameras':
+        for (const camera of panel.cameras) cameras.add(camera.name);
+        break;
+      case 'service':
+        // Service panels read their own APIs, not HA entities.
+        break;
     }
   }
 

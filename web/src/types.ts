@@ -33,6 +33,14 @@ export interface CameraRef {
 /** Polled services that get a panel of their own. Mirrors SERVICE_NAMES in server/src/config.ts. */
 export type ServiceName = 'uptimeKuma' | 'jellyfin' | 'immich';
 
+export type SystemMetricKind = 'uptime' | 'percent' | 'value';
+
+export interface SystemMetricRef extends EntityRef {
+  kind?: SystemMetricKind;
+  warn?: number;
+  crit?: number;
+}
+
 export type Panel =
   | {
       id: string;
@@ -44,7 +52,8 @@ export type Panel =
     }
   | { id: string; title: string; type: 'controls'; entities: EntityRef[] }
   | { id: string; title: string; type: 'cameras'; cameras: CameraRef[]; refreshSeconds?: number }
-  | { id: string; title: string; type: 'service'; service: ServiceName };
+  | { id: string; title: string; type: 'service'; service: ServiceName }
+  | { id: string; title: string; type: 'system'; metrics: SystemMetricRef[] };
 
 export interface DashboardConfig {
   title: string;

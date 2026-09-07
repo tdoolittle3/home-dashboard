@@ -114,8 +114,9 @@ npm run build && npm start
 
 ## Configuring panels
 
-`config/dashboard.json` — four panel types (`entities`, `controls`, `cameras`, `service`), validated
-at startup so a typo fails loudly instead of rendering an empty box. Edit and restart; no rebuild. It
+`config/dashboard.json` — five panel types (`entities`, `controls`, `cameras`, `service`, `system`),
+validated at startup so a typo fails loudly instead of rendering an empty box. Edit and restart; no
+rebuild. It
 is mounted read-only in the container.
 
 `controls` panels double as the write allowlist, so there is no second list to drift out of sync.
@@ -142,6 +143,33 @@ browser fullscreen. Escape closes it; the arrow keys move between cameras.
 The Services panel draws the largest filesystem Frigate reports as a used/free pie. Paths that share
 a filesystem report identical figures, so they are grouped rather than charted twice; the small
 tmpfs mounts stay as text.
+
+### The System panel
+
+A `system` panel shows the host itself: uptime as the headline, then one tile per reading. Each
+entry in `metrics` is an entity plus how to draw it:
+
+| Field | Meaning |
+|---|---|
+| `kind` | `uptime` (the state is an instant; show time since), `percent` (a bar), `value` (figure and unit). Inferred from the entity's device class and unit when left out. |
+| `warn`, `crit` | Readings at or above these turn amber, then red. Thresholds live in the config because what counts as hot or full depends on the box — the defaults are for a 16 GB, 12-core machine. |
+
+Uptime advances on its own every 30 s; nothing else is computed in the browser. An id that is not
+in HA renders as "not in HA" instead of disappearing, so a wrong guess is visible.
+
+The readings come from two places:
+
+- **Home Assistant's System Monitor integration** — CPU, memory, swap, load, CPU temperature,
+  network throughput and boot time. HA runs with host networking and reads `/proc` and
+  `/sys/class/hwmon`, so these describe the host, not the container. Add it under Settings →
+  Devices & services → Add integration → *System Monitor* (it has no options). **Every sensor it
+  creates is disabled by default**: open the System Monitor device, show the hidden entities and
+  enable the ones `config/dashboard.json` lists.
+- **The storage guard** in `home-automation` (`stacks/net/disk-guard.sh`) — NVMe temperature and
+  wear, read on the host where the drive is visible, published over MQTT next to the disk sensors.
+
+The LAN interface is `enp44s0`; `enp45s0` is the camera island, so its throughput is just the two
+camera streams and is not shown.
 
 Entity ids come from HA → Developer tools → States. The defaults use the storage-guard sensors and
 `switch.frontcam_white_light` — the only working white-light control on the driveway camera.
@@ -232,6 +260,13 @@ Not yet verified, and why:
 - **`call_service`.** The one HA path still unexercised. The only allowlisted control is
   `switch.frontcam_white_light`, so testing it means physically switching on the driveway
   floodlight — left for a deliberate click rather than a test run.
+- **System Monitor entity ids.** The integration was not yet added to HA when this was written,
+  so the `sensor.system_monitor_*` ids in `config/dashboard.json` are derived from the
+  integration's translation strings (`Memory usage` → `memory_usage`, `Load (1 min)` →
+  `load_1_min`, `Network throughput in enp44s0` → `network_throughput_in_enp44s0`) rather than
+  read from a live `get_states`. Any that are wrong show as "not in HA" on the panel; correct them
+  from Developer tools → States. The NVMe sensors need the updated guard script deployed and
+  `disk-guard.sh --discovery` re-run.
 - **Uptime Kuma.** Kuma has no documented REST API; its own UI talks socket.io. This reads the
   Prometheus `/metrics` endpoint with an API key as the HTTP basic password. On 2026-09-06 the live
   instance answered `401` to an unauthenticated `/metrics`, so the endpoint is there and only the
@@ -255,7 +290,8 @@ reported as `null` when absent rather than crashing the panel.
 
 ## Next steps
 
-- Sparklines from HA's history API (`history/history_during_period` over the WebSocket).
+- Sparklines from HA's history API (`history/history_during_period` over the WebSocket) — the
+  System panel's tiles are the obvious first home for them.
 - Live video via go2rtc/WebRTC instead of polled stills — that only changes `CamerasPanel`.
 - Alert badges driven by `binary_sensor.ladybird_storage_storage_problem`.
 - Issue the Jellyfin, Uptime Kuma and Immich API keys on the server and add them to

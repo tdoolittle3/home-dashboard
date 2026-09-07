@@ -6,6 +6,8 @@
     "Panels of type 'controls' double as the write allowlist: /api/action refuses any entity not listed here.",
     "An 'entities' panel with \"chart\": \"disk\" also draws the largest filesystem Frigate reports.",
     "A 'service' panel shows one polled service in depth: \"service\" is uptimeKuma, jellyfin or immich. It needs that service's *_BASE_URL and *_API_KEY in .env, and says so when they are missing.",
+    "A 'system' panel draws host readings as tiles. 'kind' is uptime | percent | value (inferred when omitted); 'warn' and 'crit' are thresholds the reading is compared against.",
+    "The sensor.system_monitor_* ids need HA's System Monitor integration (Settings -> Devices & services -> Add -> System Monitor). Ids not in HA show as 'not in HA' rather than hiding.",
     "Find entity ids in Home Assistant under Developer tools -> States."
   ],
   "panels": [
@@ -17,6 +19,22 @@
       "cameras": [
         { "name": "driveway", "label": "Driveway" },
         { "name": "backyard", "label": "Backyard" }
+      ]
+    },
+    {
+      "id": "system",
+      "title": "System",
+      "type": "system",
+      "metrics": [
+        { "entity_id": "sensor.system_monitor_last_boot", "name": "Uptime", "kind": "uptime" },
+        { "entity_id": "sensor.system_monitor_processor_use", "name": "CPU", "kind": "percent", "warn": 80, "crit": 95 },
+        { "entity_id": "sensor.system_monitor_memory_usage", "name": "Memory", "kind": "percent", "warn": 85, "crit": 95 },
+        { "entity_id": "sensor.system_monitor_swap_usage", "name": "Swap", "kind": "percent", "warn": 40, "crit": 75 },
+        { "entity_id": "sensor.system_monitor_processor_temperature", "name": "CPU temp", "warn": 85, "crit": 95 },
+        { "entity_id": "sensor.ladybird_storage_nvme_temperature", "name": "NVMe temp", "warn": 65, "crit": 75 },
+        { "entity_id": "sensor.system_monitor_load_1_min", "name": "Load (1 min)", "warn": 12, "crit": 16 },
+        { "entity_id": "sensor.system_monitor_network_throughput_in_enp44s0", "name": "Network in" },
+        { "entity_id": "sensor.system_monitor_network_throughput_out_enp44s0", "name": "Network out" }
       ]
     },
     {
