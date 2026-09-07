@@ -984,25 +984,30 @@ body {
 
 /* --- full-screen camera viewer --- */
 
+/* The picture owns the whole screen; the controls and hint float over it. */
 .viewer {
   position: fixed;
   inset: 0;
   z-index: 50;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 14px 16px 18px;
-  background: color-mix(in srgb, #000 88%, transparent);
-  backdrop-filter: blur(2px);
+  background: #000;
   animation: fade var(--motion-fast) var(--ease) both;
 }
 
 .viewer__bar {
-  flex: none;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1;
   display: flex;
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
+  /* Safe-area maxima keep the controls out of a phone notch in either orientation. */
+  padding: max(10px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) 12px
+    max(14px, env(safe-area-inset-left));
+  /* Legible over any frame, faded out before the picture's middle. */
+  background: linear-gradient(to bottom, rgb(0 0 0 / 0.72), rgb(0 0 0 / 0.35) 55%, transparent);
 }
 
 .viewer__title {
@@ -1050,8 +1055,8 @@ body {
 }
 
 .viewer__frame {
-  flex: 1 1 auto;
-  min-height: 0;
+  position: absolute;
+  inset: 0;
   margin: 0;
   display: flex;
   align-items: center;
@@ -1059,19 +1064,22 @@ body {
 }
 
 .viewer__frame img {
-  max-width: 100%;
-  max-height: 100%;
+  width: 100%;
+  height: 100%;
   object-fit: contain;
-  border-radius: var(--radius-sm);
-  background: #000;
 }
 
 .viewer__hint {
-  flex: none;
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: max(10px, env(safe-area-inset-bottom));
+  z-index: 1;
   margin: 0;
   text-align: center;
   color: var(--idle);
   font-size: var(--fs-sm);
+  text-shadow: 0 1px 3px rgb(0 0 0 / 0.9);
 }
 
 /* --- on/off switch --- */
@@ -1267,15 +1275,6 @@ body {
 
   .viewer__hint {
     display: none;
-  }
-
-  /* On a phone the overlay IS the full-screen view (iPhone Safari has no
-     Fullscreen API for it), so give the picture the whole screen: minimal
-     padding, but never under a notch or the home indicator. */
-  .viewer {
-    gap: 8px;
-    padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right))
-      max(10px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left));
   }
 }
 

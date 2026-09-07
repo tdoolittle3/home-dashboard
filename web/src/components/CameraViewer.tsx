@@ -192,10 +192,6 @@ export function CameraViewer({ cameras, index, onSelect, onClose }: CameraViewer
       role="dialog"
       aria-modal="true"
       aria-label={`${label} camera`}
-      // A click on the backdrop closes; clicks inside the frame must not.
-      onClick={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
     >
       <div className="viewer__bar">
         <span className="viewer__title">{label}</span>
@@ -239,7 +235,29 @@ export function CameraViewer({ cameras, index, onSelect, onClose }: CameraViewer
         </div>
       </div>
 
-      <figure className="viewer__frame">
+      <figure
+        className="viewer__frame"
+        // The <img> is stretched over the whole frame with object-fit: contain,
+        // so its letterbox bars are part of the element; whether a click landed
+        // on the picture or beside it is geometry, not event targets. Beside it
+        // closes, on it does not.
+        onClick={(event) => {
+          const img = event.currentTarget.querySelector('img');
+          if (!img || !img.naturalWidth || !img.naturalHeight) return;
+          const box = img.getBoundingClientRect();
+          const scale = Math.min(box.width / img.naturalWidth, box.height / img.naturalHeight);
+          const width = img.naturalWidth * scale;
+          const height = img.naturalHeight * scale;
+          const left = box.left + (box.width - width) / 2;
+          const top = box.top + (box.height - height) / 2;
+          const onPicture =
+            event.clientX >= left &&
+            event.clientX <= left + width &&
+            event.clientY >= top &&
+            event.clientY <= top + height;
+          if (!onPicture) onClose();
+        }}
+      >
         {streaming ? (
           <img
             key={`stream-${camera.name}-${streamKey}`}
