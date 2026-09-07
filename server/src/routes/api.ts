@@ -1,3 +1,5 @@
+import { Readable } from 'node:stream';
+import type { ReadableStream as WebReadableStream } from 'node:stream/web';
 import type { FastifyInstance } from 'fastify';
 import type { AppConfig } from '../config.js';
 import type { HaClient } from '../ha/client.js';
@@ -5,6 +7,18 @@ import type { SnapshotBuilder } from '../snapshot.js';
 import { fetchWithTimeout } from '../sources/http.js';
 
 const ACTIONS = new Set(['turn_on', 'turn_off', 'toggle']);
+
+/** Frigate resizes on its side; keep the request inside what a dashboard tile can use. */
+function clampHeight(raw: string | undefined): number {
+  const requested = Number(raw);
+  return Number.isFinite(requested) ? Math.min(Math.max(Math.round(requested), 90), 1080) : 360;
+}
+
+/** Frigate cannot serve faster than the camera's detect fps (5 here), so more is just wasted encoding. */
+function clampFps(raw: string | undefined): number {
+  const requested = Number(raw);
+  return Number.isFinite(requested) ? Math.min(Math.max(Math.round(requested), 1), 10) : 5;
+}
 
 interface ActionBody {
   entity_id?: unknown;
@@ -74,8 +88,7 @@ export function registerApiRoutes(
         return reply.code(503).send({ error: 'FRIGATE_BASE_URL is not configured' });
       }
 
-      const requested = Number(request.query.h);
-      const height = Number.isFinite(requested) ? Math.min(Math.max(Math.round(requested), 90), 1080) : 360;
+      const height = clampHeight(request.query.h);
 
       try {
         const upstream = await fetchWithTimeout(`${frigate.baseUrl}/api/${name}/latest.jpg?h=${height}`, {
@@ -93,6 +106,57 @@ export function registerApiRoutes(
         const message = error instanceof Error ? error.message : String(error);
         return reply.code(502).send({ error: message });
       }
+    },
+  );
+
+  /**
+   * Live view: pipes Frigate's MJPEG stream for a camera straight through to
+   * the browser. Frigate JPEG-encodes every frame per connected viewer, so the
+   * client abort is propagated upstream the moment a tab goes away - otherwise
+   * Frigate keeps encoding for nobody until its own write fails.
+   */
+  app.get<{ Params: { name: string }; Querystring: { h?: string; fps?: string } }>(
+    '/api/camera/:name/stream',
+    async (request, reply) => {
+      const { name } = request.params;
+      if (!config.proxyableCameras.has(name)) {
+        return reply.code(404).send({ error: 'unknown camera' });
+      }
+      const frigate = config.frigate;
+      if (!frigate) {
+        return reply.code(503).send({ error: 'FRIGATE_BASE_URL is not configured' });
+      }
+
+      const height = clampHeight(request.query.h);
+      const fps = clampFps(request.query.fps);
+
+      const controller = new AbortController();
+      request.raw.on('close', () => controller.abort());
+      // Only the wait for headers is bounded; the body is open-ended by design.
+      const headerTimer = setTimeout(() => controller.abort(), 8_000);
+
+      let upstream: Response;
+      try {
+        upstream = await fetch(`${frigate.baseUrl}/api/${name}?fps=${fps}&h=${height}`, {
+          signal: controller.signal,
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        return reply.code(502).send({ error: message });
+      } finally {
+        clearTimeout(headerTimer);
+      }
+
+      if (!upstream.ok || !upstream.body) {
+        return reply.code(502).send({ error: `frigate returned ${upstream.status}` });
+      }
+
+      return reply
+        .header('Content-Type', upstream.headers.get('content-type') ?? 'multipart/x-mixed-replace;boundary=frame')
+        .header('Cache-Control', 'no-store')
+        // Some reverse proxies buffer chunked bodies; MJPEG is useless buffered.
+        .header('X-Accel-Buffering', 'no')
+        .send(Readable.fromWeb(upstream.body as unknown as WebReadableStream<Uint8Array>));
     },
   );
 }

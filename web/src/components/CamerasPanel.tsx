@@ -13,9 +13,10 @@ interface CamerasPanelProps {
 }
 
 /**
- * Polls Frigate stills through the backend rather than embedding a live stream.
- * A still every few seconds costs the detector nothing; MJPEG or WebRTC per open
- * tab does not. Swapping in go2rtc/WebRTC later only changes this component.
+ * The hero row polls Frigate stills through the backend rather than embedding
+ * live streams: a still every few seconds costs the detector nothing, while
+ * Frigate encodes MJPEG per connected viewer. The live stream runs only in the
+ * full-screen viewer, where someone has deliberately opened one camera.
  */
 export function CamerasPanel({ title, cameras, refreshSeconds, stillHeight = 360 }: CamerasPanelProps) {
   const [tick, setTick] = useState(() => Date.now());
@@ -62,13 +63,7 @@ export function CamerasPanel({ title, cameras, refreshSeconds, stillHeight = 360
       </div>
 
       {viewing !== null ? (
-        <CameraViewer
-          cameras={cameras}
-          index={viewing}
-          refreshSeconds={refreshSeconds}
-          onSelect={setViewing}
-          onClose={() => setViewing(null)}
-        />
+        <CameraViewer cameras={cameras} index={viewing} onSelect={setViewing} onClose={() => setViewing(null)} />
       ) : null}
     </Panel>
   );

@@ -37,7 +37,7 @@ browser ──/api──> server (holds every API key) ──> HA :8123
 The server also:
 
 - fans one HA subscription out to every open tab, instead of one per browser;
-- proxies camera stills, so the browser needs no route to the camera island and no knowledge of
+- proxies camera stills and live MJPEG, so the browser needs no route to the camera island and no knowledge of
   Frigate's unauthenticated port;
 - enforces a **write allowlist** — `/api/action` refuses any entity not listed in a `controls`
   panel in `config/dashboard.json`. A compromised page cannot call arbitrary HA services.
@@ -72,6 +72,7 @@ config/           dashboard.json — which panels exist, edited without a rebuil
 | `GET /api/stream` | SSE — `snapshot`, `state`, `ha`, `sources` events |
 | `POST /api/action` | `{entity_id, action}` where action is `turn_on`/`turn_off`/`toggle` |
 | `GET /api/camera/:name/snapshot?h=360` | proxied Frigate still |
+| `GET /api/camera/:name/stream?h=1080&fps=5` | proxied Frigate MJPEG, open-ended; the client abort tears down the upstream |
 
 Server-sent events rather than a WebSocket: data only ever flows server → browser, and
 `EventSource` reconnects on its own.
@@ -292,7 +293,9 @@ reported as `null` when absent rather than crashing the panel.
 
 - Sparklines from HA's history API (`history/history_during_period` over the WebSocket) — the
   System panel's tiles are the obvious first home for them.
-- Live video via go2rtc/WebRTC instead of polled stills — that only changes `CamerasPanel`.
+- The full-screen viewer is live MJPEG; the hero row stays polled stills because Frigate encodes
+  per connected viewer. go2rtc/WebRTC would drop latency below MJPEG's ~1 s and only changes
+  `CameraViewer`.
 - Alert badges driven by `binary_sensor.ladybird_storage_storage_problem`.
 - Issue the Jellyfin, Uptime Kuma and Immich API keys on the server and add them to
   `/opt/stacks/dash/.env`, then `docker compose up -d --force-recreate` to pick them up.

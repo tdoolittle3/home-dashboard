@@ -5,29 +5,49 @@ interface CameraViewerProps {
   cameras: CameraRef[];
   /** Index into `cameras` of the one being shown. */
   index: number;
-  refreshSeconds: number;
   onSelect: (index: number) => void;
   onClose: () => void;
 }
 
+/** How long a dropped stream stays on its fallback still before reconnecting. */
+const STREAM_RETRY_MS = 5_000;
+
 /**
- * Full-screen still viewer. The panel thumbnails ask Frigate for a 360px-high
- * frame; here we ask for 1080 instead, which is the ceiling the proxy allows.
+ * Full-screen live viewer. The panel thumbnails stay cheap polled stills; only
+ * here, where someone is actually watching, does the MJPEG stream run - Frigate
+ * encodes per viewer, so streams are opened deliberately and torn down eagerly.
+ * Pausing, hiding the tab, or a dropped stream all fall back to a still.
  *
  * This is an overlay first and a real Fullscreen API call second: the overlay
  * works everywhere and can be dismissed with Escape, while browser fullscreen
  * needs a user gesture and is refused in some embedded contexts.
  */
-export function CameraViewer({ cameras, index, refreshSeconds, onSelect, onClose }: CameraViewerProps) {
+export function CameraViewer({ cameras, index, onSelect, onClose }: CameraViewerProps) {
   const camera = cameras[index];
   const [tick, setTick] = useState(() => Date.now());
   const [paused, setPaused] = useState(false);
+  const [hidden, setHidden] = useState(() => document.visibilityState === 'hidden');
+  const [streamDown, setStreamDown] = useState(false);
+  // Bumped to force a new <img> connection when the stream needs a reconnect.
+  const [streamKey, setStreamKey] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   const overlayRef = useRef<HTMLDivElement | null>(null);
   const closeRef = useRef<HTMLButtonElement | null>(null);
 
-  const refreshNow = useCallback(() => setTick(Date.now()), []);
+  const streaming = !paused && !hidden && !streamDown;
+
+  // Refresh the still when frozen; force a reconnect when live.
+  const refreshNow = useCallback(() => {
+    setTick(Date.now());
+    setStreamKey((current) => current + 1);
+  }, []);
+
+  // Pausing freezes on a still fetched now, not one from when the viewer opened.
+  const togglePaused = useCallback(() => {
+    setTick(Date.now());
+    setPaused((current) => !current);
+  }, []);
 
   const step = useCallback(
     (delta: number) => {
@@ -35,16 +55,28 @@ export function CameraViewer({ cameras, index, refreshSeconds, onSelect, onClose
       // Wrap in both directions so the arrow keys never dead-end.
       onSelect((index + delta + cameras.length) % cameras.length);
       setTick(Date.now());
+      setStreamDown(false);
     },
     [cameras.length, index, onSelect],
   );
 
-  // Poll for a fresh still unless the viewer is paused.
+  // A hidden tab must not keep Frigate encoding; dropping to the still closes
+  // the stream connection, and coming back reopens it.
   useEffect(() => {
-    if (paused) return;
-    const interval = setInterval(() => setTick(Date.now()), Math.max(refreshSeconds, 1) * 1000);
-    return () => clearInterval(interval);
-  }, [paused, refreshSeconds]);
+    const sync = () => setHidden(document.visibilityState === 'hidden');
+    document.addEventListener('visibilitychange', sync);
+    return () => document.removeEventListener('visibilitychange', sync);
+  }, []);
+
+  // A dropped stream shows its fallback still, then quietly tries again.
+  useEffect(() => {
+    if (!streamDown) return;
+    const timer = setTimeout(() => {
+      setStreamDown(false);
+      setStreamKey((current) => current + 1);
+    }, STREAM_RETRY_MS);
+    return () => clearTimeout(timer);
+  }, [streamDown]);
 
   // Move focus in on open and hand it back to the trigger on close, so keyboard
   // users are not dropped at the top of the document.
@@ -87,7 +119,7 @@ export function CameraViewer({ cameras, index, refreshSeconds, onSelect, onClose
         step(-1);
       } else if (event.key === ' ' || event.key === 'Spacebar') {
         event.preventDefault();
-        setPaused((current) => !current);
+        togglePaused();
       } else if (event.key === 'r' || event.key === 'R') {
         refreshNow();
       }
@@ -95,7 +127,7 @@ export function CameraViewer({ cameras, index, refreshSeconds, onSelect, onClose
 
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [onClose, refreshNow, step]);
+  }, [onClose, refreshNow, step, togglePaused]);
 
   const toggleFullscreen = useCallback(() => {
     const node = overlayRef.current;
@@ -126,7 +158,13 @@ export function CameraViewer({ cameras, index, refreshSeconds, onSelect, onClose
     >
       <div className="viewer__bar">
         <span className="viewer__title">{label}</span>
-        {paused ? <span className="pill">paused</span> : <span className="pill pill--live">live</span>}
+        {paused ? (
+          <span className="pill">paused</span>
+        ) : streamDown ? (
+          <span className="pill">reconnecting</span>
+        ) : (
+          <span className="pill pill--live">live</span>
+        )}
 
         <div className="viewer__actions">
           {cameras.length > 1 ? (
@@ -143,16 +181,11 @@ export function CameraViewer({ cameras, index, refreshSeconds, onSelect, onClose
             </>
           ) : null}
 
-          <button
-            type="button"
-            className="viewer__btn"
-            onClick={() => setPaused((current) => !current)}
-            aria-pressed={paused}
-          >
+          <button type="button" className="viewer__btn" onClick={togglePaused} aria-pressed={paused}>
             {paused ? 'Resume' : 'Pause'}
           </button>
           <button type="button" className="viewer__btn" onClick={refreshNow}>
-            Refresh
+            Reconnect
           </button>
           <button type="button" className="viewer__btn" onClick={toggleFullscreen} aria-pressed={isFullscreen}>
             {isFullscreen ? 'Exit full screen' : 'Full screen'}
@@ -164,10 +197,19 @@ export function CameraViewer({ cameras, index, refreshSeconds, onSelect, onClose
       </div>
 
       <figure className="viewer__frame">
-        <img src={`/api/camera/${camera.name}/snapshot?h=1080&t=${tick}`} alt={`Latest still from ${label}`} />
+        {streaming ? (
+          <img
+            key={`stream-${camera.name}-${streamKey}`}
+            src={`/api/camera/${camera.name}/stream?h=1080&fps=5&k=${streamKey}`}
+            alt={`Live view of ${label}`}
+            onError={() => setStreamDown(true)}
+          />
+        ) : (
+          <img src={`/api/camera/${camera.name}/snapshot?h=1080&t=${tick}`} alt={`Latest still from ${label}`} />
+        )}
       </figure>
 
-      <p className="viewer__hint">Esc to close · ← → to switch cameras · Space to pause · R to refresh</p>
+      <p className="viewer__hint">Esc to close · ← → to switch cameras · Space to pause · R to reconnect</p>
     </div>
   );
 }
