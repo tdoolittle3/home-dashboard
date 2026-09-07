@@ -73,6 +73,8 @@ config/           dashboard.json — which panels exist, edited without a rebuil
 | `POST /api/action` | `{entity_id, action}` where action is `turn_on`/`turn_off`/`toggle` |
 | `GET /api/camera/:name/snapshot?h=360` | proxied Frigate still |
 | `GET /api/camera/:name/stream?h=1080&fps=5` | proxied Frigate MJPEG, open-ended; the client abort tears down the upstream |
+| `GET /api/camera/:name/live.m3u8` + `hls/*` | HLS (fMP4) relayed from Frigate's go2rtc — what iPhone Safari plays in a `<video>` |
+| `GET /api/camera/:name/live.mp4` | endless fMP4 from go2rtc for Chrome/Edge/Android, open-ended like the MJPEG stream |
 
 Server-sent events rather than a WebSocket: data only ever flows server → browser, and
 `EventSource` reconnects on its own.
@@ -293,9 +295,13 @@ reported as `null` when absent rather than crashing the panel.
 
 - Sparklines from HA's history API (`history/history_during_period` over the WebSocket) — the
   System panel's tiles are the obvious first home for them.
-- The full-screen viewer is live MJPEG; the hero row stays polled stills because Frigate encodes
-  per connected viewer. go2rtc/WebRTC would drop latency below MJPEG's ~1 s and only changes
-  `CameraViewer`.
+- The full-screen viewer plays real video from Frigate's go2rtc (HLS on WebKit, fMP4 elsewhere)
+  and drops to MJPEG when the browser lacks the camera's codec (the cameras send H.265, which
+  Firefox will not decode) or the camera is missing from go2rtc — as `backyard` is today: it is
+  not in the go2rtc config (`go2rtc_homekit.yml` inside the Frigate container), so it streams
+  MJPEG until it is added there. The hero row stays polled stills because every live transport
+  costs encoding or packaging per viewer. WebRTC would cut latency under a second, but needs
+  go2rtc ICE candidates configured for LAN and the 8555 media ports reachable from the browser.
 - Alert badges driven by `binary_sensor.ladybird_storage_storage_problem`.
 - Issue the Jellyfin, Uptime Kuma and Immich API keys on the server and add them to
   `/opt/stacks/dash/.env`, then `docker compose up -d --force-recreate` to pick them up.

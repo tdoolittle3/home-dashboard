@@ -159,4 +159,102 @@ export function registerApiRoutes(
         .send(Readable.fromWeb(upstream.body as unknown as WebReadableStream<Uint8Array>));
     },
   );
+
+  /*
+   * Real video for the full-screen viewer, relayed from Frigate's bundled
+   * go2rtc (reachable behind Frigate's port at /api/go2rtc). Two transports,
+   * because no single one plays everywhere:
+   *
+   * - live.m3u8: HLS with fMP4 segments - the only thing iPhone Safari plays
+   *   in a <video>, and Apple requires fMP4 rather than TS for H.265.
+   * - live.mp4: one endless fMP4 stream - Chrome, Edge and Android, lower
+   *   latency than HLS.
+   *
+   * A camera absent from go2rtc (or a browser without an H.265 decoder) makes
+   * the <video> error out and the viewer falls back to MJPEG on its own.
+   */
+
+  /** Guards every path under /api/camera; returns the go2rtc api base or null after replying. */
+  const go2rtcBase = (name: string): string | null =>
+    config.proxyableCameras.has(name) && config.frigate ? `${config.frigate.baseUrl}/api/go2rtc/api` : null;
+
+  app.get<{ Params: { name: string } }>('/api/camera/:name/live.m3u8', async (request, reply) => {
+    const base = go2rtcBase(request.params.name);
+    if (!base) return reply.code(config.frigate ? 404 : 503).send({ error: 'unknown camera or no frigate' });
+
+    try {
+      // The master playlist references hls/playlist.m3u8 relatively, which the
+      // browser resolves under /api/camera/:name/ - the hls route below.
+      const upstream = await fetchWithTimeout(
+        `${base}/stream.m3u8?src=${encodeURIComponent(request.params.name)}&mp4`,
+        { timeoutMs: 8_000 },
+      );
+      if (!upstream.ok) return reply.code(502).send({ error: `go2rtc returned ${upstream.status}` });
+      return reply
+        .header('Content-Type', 'application/vnd.apple.mpegurl')
+        .header('Cache-Control', 'no-store')
+        .send(Buffer.from(await upstream.arrayBuffer()));
+    } catch (error) {
+      return reply.code(502).send({ error: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
+  // Media playlist, init segment and media segments, named by the master
+  // playlist. The id/n query values are go2rtc session state, passed through.
+  const HLS_FILES = new Set(['playlist.m3u8', 'init.mp4', 'segment.m4s', 'segment.ts']);
+
+  app.get<{ Params: { name: string; file: string }; Querystring: Record<string, string> }>(
+    '/api/camera/:name/hls/:file',
+    async (request, reply) => {
+      const base = go2rtcBase(request.params.name);
+      if (!base) return reply.code(config.frigate ? 404 : 503).send({ error: 'unknown camera or no frigate' });
+      if (!HLS_FILES.has(request.params.file)) return reply.code(404).send({ error: 'unknown hls file' });
+
+      const query = new URLSearchParams(request.query).toString();
+      try {
+        const upstream = await fetchWithTimeout(`${base}/hls/${request.params.file}?${query}`, { timeoutMs: 8_000 });
+        if (!upstream.ok) return reply.code(502).send({ error: `go2rtc returned ${upstream.status}` });
+        return reply
+          .header(
+            'Content-Type',
+            upstream.headers.get('content-type') ??
+              (request.params.file.endsWith('.m3u8') ? 'application/vnd.apple.mpegurl' : 'video/mp4'),
+          )
+          .header('Cache-Control', 'no-store')
+          .send(Buffer.from(await upstream.arrayBuffer()));
+      } catch (error) {
+        return reply.code(502).send({ error: error instanceof Error ? error.message : String(error) });
+      }
+    },
+  );
+
+  app.get<{ Params: { name: string } }>('/api/camera/:name/live.mp4', async (request, reply) => {
+    const base = go2rtcBase(request.params.name);
+    if (!base) return reply.code(config.frigate ? 404 : 503).send({ error: 'unknown camera or no frigate' });
+
+    // Open-ended like the MJPEG stream: abort upstream the moment the tab goes.
+    const controller = new AbortController();
+    request.raw.on('close', () => controller.abort());
+    const headerTimer = setTimeout(() => controller.abort(), 8_000);
+
+    let upstream: Response;
+    try {
+      upstream = await fetch(`${base}/stream.mp4?src=${encodeURIComponent(request.params.name)}`, {
+        signal: controller.signal,
+      });
+    } catch (error) {
+      return reply.code(502).send({ error: error instanceof Error ? error.message : String(error) });
+    } finally {
+      clearTimeout(headerTimer);
+    }
+    if (!upstream.ok || !upstream.body) {
+      return reply.code(502).send({ error: `go2rtc returned ${upstream.status}` });
+    }
+
+    return reply
+      .header('Content-Type', upstream.headers.get('content-type') ?? 'video/mp4')
+      .header('Cache-Control', 'no-store')
+      .header('X-Accel-Buffering', 'no')
+      .send(Readable.fromWeb(upstream.body as unknown as WebReadableStream<Uint8Array>));
+  });
 }

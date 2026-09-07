@@ -23,6 +23,11 @@ interface WebkitElement extends HTMLElement {
   webkitRequestFullscreen?: () => Promise<void> | void;
 }
 
+/** iPhone's only full screen: the native video player, offered on <video> alone. */
+interface WebkitVideoElement extends HTMLVideoElement {
+  webkitEnterFullscreen?: () => void;
+}
+
 interface WebkitDocument extends Document {
   webkitFullscreenEnabled?: boolean;
   webkitFullscreenElement?: Element | null;
@@ -32,6 +37,15 @@ interface WebkitDocument extends Document {
 const doc = document as WebkitDocument;
 
 const FULLSCREEN_SUPPORTED = document.fullscreenEnabled || doc.webkitFullscreenEnabled === true;
+
+/** iPhone: no Fullscreen API for the overlay, but <video> can enter the native player. */
+const VIDEO_FULLSCREEN_SUPPORTED = 'webkitEnterFullscreen' in HTMLVideoElement.prototype;
+
+/**
+ * Safari (and every iOS browser, all WebKit) plays HLS natively in a <video>;
+ * everything else gets go2rtc's endless fMP4, which is lower latency anyway.
+ */
+const NATIVE_HLS = document.createElement('video').canPlayType('application/vnd.apple.mpegurl') !== '';
 
 function currentFullscreenElement(): Element | null {
   return document.fullscreenElement ?? doc.webkitFullscreenElement ?? null;
@@ -51,13 +65,16 @@ function exitFullscreen(): void {
 
 /**
  * Full-screen live viewer. The panel thumbnails stay cheap polled stills; only
- * here, where someone is actually watching, does the MJPEG stream run - Frigate
- * encodes per viewer, so streams are opened deliberately and torn down eagerly.
- * Pausing, hiding the tab, or a dropped stream all fall back to a still.
+ * here, where someone is actually watching, does a live connection open. The
+ * live element is a real <video> fed by go2rtc through the backend (native HLS
+ * on WebKit, endless fMP4 elsewhere); a browser that cannot play the camera's
+ * codec, or a camera go2rtc does not carry, drops to the MJPEG stream, and
+ * pausing, hiding the tab, or a dropped MJPEG stream fall back to a still.
  *
  * This is an overlay first and a real Fullscreen API call second: the overlay
  * works everywhere and can be dismissed with Escape, while browser fullscreen
- * needs a user gesture and is refused in some embedded contexts.
+ * needs a user gesture and is refused in some embedded contexts. On iPhone,
+ * where only <video> can go full screen, the button uses the native player.
  */
 export function CameraViewer({ cameras, index, onSelect, onClose }: CameraViewerProps) {
   const camera = cameras[index];
@@ -65,11 +82,15 @@ export function CameraViewer({ cameras, index, onSelect, onClose }: CameraViewer
   const [paused, setPaused] = useState(false);
   const [hidden, setHidden] = useState(() => document.visibilityState === 'hidden');
   const [streamDown, setStreamDown] = useState(false);
-  // Bumped to force a new <img> connection when the stream needs a reconnect.
+  // A browser that cannot play the camera's codec (or a camera go2rtc does not
+  // carry) fails the <video> once; MJPEG takes over for the rest of the visit.
+  const [videoDown, setVideoDown] = useState(false);
+  // Bumped to force a new connection when the stream needs a reconnect.
   const [streamKey, setStreamKey] = useState(0);
   const [isFullscreen, setIsFullscreen] = useState(false);
 
   const overlayRef = useRef<HTMLDivElement | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
   const closeRef = useRef<HTMLButtonElement | null>(null);
 
   const streaming = !paused && !hidden && !streamDown;
@@ -77,6 +98,7 @@ export function CameraViewer({ cameras, index, onSelect, onClose }: CameraViewer
   // Refresh the still when frozen; force a reconnect when live.
   const refreshNow = useCallback(() => {
     setTick(Date.now());
+    setVideoDown(false);
     setStreamKey((current) => current + 1);
   }, []);
 
@@ -93,6 +115,7 @@ export function CameraViewer({ cameras, index, onSelect, onClose }: CameraViewer
       onSelect((index + delta + cameras.length) % cameras.length);
       setTick(Date.now());
       setStreamDown(false);
+      setVideoDown(false);
     },
     [cameras.length, index, onSelect],
   );
@@ -172,13 +195,19 @@ export function CameraViewer({ cameras, index, onSelect, onClose }: CameraViewer
   }, [onClose, refreshNow, step, togglePaused]);
 
   const toggleFullscreen = useCallback(() => {
-    const node = overlayRef.current;
-    if (!node) return;
-    if (currentFullscreenElement()) {
-      exitFullscreen();
-    } else {
-      requestFullscreenOn(node);
+    if (FULLSCREEN_SUPPORTED) {
+      const node = overlayRef.current;
+      if (!node) return;
+      if (currentFullscreenElement()) {
+        exitFullscreen();
+      } else {
+        requestFullscreenOn(node);
+      }
+      return;
     }
+    // iPhone: hand the <video> to the native player, which owns its own
+    // controls and exit gesture.
+    (videoRef.current as WebkitVideoElement | null)?.webkitEnterFullscreen?.();
   }, []);
 
   if (!camera) return null;
@@ -224,7 +253,7 @@ export function CameraViewer({ cameras, index, onSelect, onClose }: CameraViewer
           <button type="button" className="viewer__btn" onClick={refreshNow}>
             Reconnect
           </button>
-          {FULLSCREEN_SUPPORTED ? (
+          {FULLSCREEN_SUPPORTED || (VIDEO_FULLSCREEN_SUPPORTED && streaming && !videoDown) ? (
             <button type="button" className="viewer__btn" onClick={toggleFullscreen} aria-pressed={isFullscreen}>
               {isFullscreen ? 'Exit full screen' : 'Full screen'}
             </button>
@@ -237,17 +266,23 @@ export function CameraViewer({ cameras, index, onSelect, onClose }: CameraViewer
 
       <figure
         className="viewer__frame"
-        // The <img> is stretched over the whole frame with object-fit: contain,
+        // The media is stretched over the whole frame with object-fit: contain,
         // so its letterbox bars are part of the element; whether a click landed
         // on the picture or beside it is geometry, not event targets. Beside it
         // closes, on it does not.
         onClick={(event) => {
-          const img = event.currentTarget.querySelector('img');
-          if (!img || !img.naturalWidth || !img.naturalHeight) return;
-          const box = img.getBoundingClientRect();
-          const scale = Math.min(box.width / img.naturalWidth, box.height / img.naturalHeight);
-          const width = img.naturalWidth * scale;
-          const height = img.naturalHeight * scale;
+          const media = event.currentTarget.querySelector('video, img') as
+            | HTMLVideoElement
+            | HTMLImageElement
+            | null;
+          if (!media) return;
+          const naturalWidth = 'videoWidth' in media ? media.videoWidth : media.naturalWidth;
+          const naturalHeight = 'videoHeight' in media ? media.videoHeight : media.naturalHeight;
+          if (!naturalWidth || !naturalHeight) return;
+          const box = media.getBoundingClientRect();
+          const scale = Math.min(box.width / naturalWidth, box.height / naturalHeight);
+          const width = naturalWidth * scale;
+          const height = naturalHeight * scale;
           const left = box.left + (box.width - width) / 2;
           const top = box.top + (box.height - height) / 2;
           const onPicture =
@@ -258,7 +293,18 @@ export function CameraViewer({ cameras, index, onSelect, onClose }: CameraViewer
           if (!onPicture) onClose();
         }}
       >
-        {streaming ? (
+        {streaming && !videoDown ? (
+          <video
+            key={`video-${camera.name}-${streamKey}`}
+            ref={videoRef}
+            src={`/api/camera/${camera.name}/${NATIVE_HLS ? 'live.m3u8' : 'live.mp4'}?k=${streamKey}`}
+            autoPlay
+            muted
+            playsInline
+            aria-label={`Live view of ${label}`}
+            onError={() => setVideoDown(true)}
+          />
+        ) : streaming ? (
           <img
             key={`stream-${camera.name}-${streamKey}`}
             src={`/api/camera/${camera.name}/stream?h=1080&fps=5&k=${streamKey}`}
