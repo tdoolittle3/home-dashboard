@@ -7,6 +7,7 @@
     "An 'entities' panel with \"chart\": \"disk\" also draws the largest filesystem Frigate reports.",
     "A 'service' panel shows one polled service in depth: \"service\" is uptimeKuma, jellyfin or immich. It needs that service's *_BASE_URL and *_API_KEY in .env, and says so when they are missing.",
     "A 'system' panel draws host readings as tiles. 'kind' is uptime | percent | value (inferred when omitted); 'warn' and 'crit' are thresholds the reading is compared against.",
+    "A 'ups' panel draws the rack UPS as a battery gauge. Its 'entities' object maps the five roles (charge, runtime, load, voltage, problem) to the ladybird_ups MQTT discovery entities; the problem sensor's attributes drive the ok/warning/critical look.",
     "The sensor.system_monitor_* ids need HA's System Monitor integration (Settings -> Devices & services -> Add -> System Monitor). Ids not in HA show as 'not in HA' rather than hiding.",
     "Find entity ids in Home Assistant under Developer tools -> States."
   ],
@@ -49,6 +50,18 @@
         { "entity_id": "sensor.ladybird_storage_frigate_recordings", "name": "Frigate recordings" },
         { "entity_id": "sensor.ladybird_storage_media_library", "name": "Media library" }
       ]
+    },
+    {
+      "id": "power",
+      "title": "Power",
+      "type": "ups",
+      "entities": {
+        "charge": "sensor.ladybird_ups_battery_charge",
+        "runtime": "sensor.ladybird_ups_battery_runtime",
+        "load": "sensor.ladybird_ups_ups_load",
+        "voltage": "sensor.ladybird_ups_input_voltage",
+        "problem": "binary_sensor.ladybird_ups_power_problem"
+      }
     },
     {
       "id": "uptime",

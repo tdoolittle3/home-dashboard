@@ -1178,6 +1178,214 @@ body {
   border-color: var(--accent);
 }
 
+/* --- ups panel: battery gauge, quiet until the power is not --- */
+
+.ups {
+  display: grid;
+  gap: 12px;
+  justify-items: center;
+}
+
+/* The three moods live on one custom property; gauge, hero and stats all read
+   it, so a status change recolours the whole panel in one place. */
+.ups--ok {
+  --ups-tone: var(--up);
+}
+
+.ups--warning {
+  --ups-tone: var(--warn);
+}
+
+.ups--critical {
+  --ups-tone: var(--down);
+}
+
+.ups--off {
+  --ups-tone: var(--idle);
+}
+
+.ups__banner {
+  width: 100%;
+  display: grid;
+  gap: 2px;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid color-mix(in srgb, var(--ups-tone) 45%, var(--border));
+  background: color-mix(in srgb, var(--ups-tone) 10%, transparent);
+}
+
+.ups__banner-title {
+  font-size: var(--fs-md);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--ups-tone);
+}
+
+.ups__banner--critical .ups__banner-title {
+  text-transform: uppercase;
+  animation: ups-pulse 1.8s var(--ease) infinite;
+}
+
+.ups__banner--off {
+  border-style: dashed;
+  background: none;
+}
+
+.ups__banner--off .ups__banner-title {
+  font-weight: 600;
+  letter-spacing: normal;
+}
+
+.ups__banner-reason {
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+  overflow-wrap: anywhere;
+}
+
+.ups__gauge {
+  position: relative;
+  width: 180px;
+  height: 180px;
+}
+
+.ups__gauge svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.ups__gauge-track {
+  fill: none;
+  stroke: color-mix(in srgb, var(--text) 8%, transparent);
+  stroke-linecap: round;
+}
+
+.ups__gauge-fill {
+  fill: none;
+  stroke: var(--ups-tone);
+  stroke-linecap: round;
+  transition: stroke var(--motion-base) var(--ease);
+}
+
+.ups--critical .ups__gauge-fill {
+  animation: ups-pulse 1.8s var(--ease) infinite;
+}
+
+/* The figures sit in the arc's mouth, like the disk donut's hero. */
+.ups__gauge-text {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  text-align: center;
+  pointer-events: none;
+}
+
+.ups__hero {
+  font-size: var(--fs-hero);
+  font-weight: 650;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+
+.ups--critical .ups__hero {
+  color: var(--down);
+  font-size: 34px;
+}
+
+.ups__hero--dim {
+  color: var(--text-dim);
+  font-weight: 500;
+}
+
+.ups__hero-unit {
+  font-size: 0.55em;
+  font-weight: 600;
+  margin-left: 1px;
+  color: var(--text-dim);
+}
+
+.ups__hero-sub {
+  margin-top: 5px;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+  max-width: 120px;
+}
+
+.ups__stats {
+  display: flex;
+  gap: 28px;
+}
+
+.ups__stat {
+  display: grid;
+  justify-items: center;
+  gap: 1px;
+}
+
+.ups__stat-value {
+  font-size: var(--fs-lg);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.ups--warning .ups__stat-value {
+  color: var(--warn);
+}
+
+.ups__stat-label {
+  color: var(--text-dim);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.ups__spark {
+  width: 100%;
+}
+
+.ups__spark svg {
+  display: block;
+  width: 100%;
+  height: 40px;
+}
+
+.ups__spark-line {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  /* preserveAspectRatio="none" stretches the drawing, not just the box. */
+  vector-effect: non-scaling-stroke;
+}
+
+.ups__spark-nominal {
+  stroke: color-mix(in srgb, var(--text) 15%, transparent);
+  stroke-width: 1;
+  stroke-dasharray: 3 4;
+  vector-effect: non-scaling-stroke;
+}
+
+.ups__spark-caption {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 4px;
+  color: var(--idle);
+  font-size: var(--fs-xs);
+  font-variant-numeric: tabular-nums;
+}
+
+@keyframes ups-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.55;
+  }
+}
+
 /* --- motion --- */
 
 @keyframes rise {
@@ -1232,7 +1440,9 @@ body {
   .panel,
   .viewer,
   .pill--live .pill__dot,
-  .tile__dot--up {
+  .tile__dot--up,
+  .ups__banner--critical .ups__banner-title,
+  .ups--critical .ups__gauge-fill {
     animation: none;
   }
 }

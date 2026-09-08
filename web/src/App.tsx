@@ -6,6 +6,7 @@ import { PhotosPanel } from './components/PhotosPanel';
 import { ServicesPanel } from './components/ServicesPanel';
 import { StoragePanel } from './components/StoragePanel';
 import { SystemPanel } from './components/SystemPanel';
+import { UpsPanel } from './components/UpsPanel';
 import { UptimePanel } from './components/UptimePanel';
 import { formatRelative } from './format';
 import type { Panel } from './types';
@@ -78,6 +79,9 @@ export function App() {
     }
     if (panel.type === 'system') {
       return <SystemPanel key={panel.id} title={panel.title} metrics={panel.metrics} entities={entities} />;
+    }
+    if (panel.type === 'ups') {
+      return <UpsPanel key={panel.id} title={panel.title} refs={panel.entities} entities={entities} />;
     }
     if (panel.chart === 'disk') {
       return (

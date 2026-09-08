@@ -4,9 +4,23 @@ import type { FastifyInstance } from 'fastify';
 import type { AppConfig } from '../config.js';
 import type { HaClient } from '../ha/client.js';
 import type { SnapshotBuilder } from '../snapshot.js';
-import { fetchWithTimeout } from '../sources/http.js';
+import { fetchWithTimeout, getJson } from '../sources/http.js';
 
 const ACTIONS = new Set(['turn_on', 'turn_off', 'toggle']);
+
+/** One recorded state in HA's REST history reply, trimmed by minimal_response. */
+interface HistoryRow {
+  state?: string;
+  last_changed?: string;
+  /** Compact key some HA versions use for last_updated, epoch seconds. */
+  lu?: number;
+}
+
+/** A day of context by default; two at most - this backs a sparkline, not Grafana. */
+function clampHours(raw: string | undefined): number {
+  const requested = Number(raw);
+  return Number.isFinite(requested) ? Math.min(Math.max(Math.round(requested), 1), 48) : 24;
+}
 
 /** Frigate resizes on its side; keep the request inside what a dashboard tile can use. */
 function clampHeight(raw: string | undefined): number {
@@ -38,6 +52,49 @@ export function registerApiRoutes(
   }));
 
   app.get('/api/dashboard', async () => snapshots.build());
+
+  /**
+   * Recent numeric history for one dashboard entity, for sparklines. This is
+   * the only place the server calls HA's REST API - state itself rides the
+   * WebSocket. Restricted to watched entities so the token's reach into the
+   * recorder never exceeds what the dashboard already shows.
+   */
+  const watched = new Set(config.watchedEntities);
+  app.get<{ Params: { entityId: string }; Querystring: { hours?: string } }>(
+    '/api/history/:entityId',
+    async (request, reply) => {
+      const { entityId } = request.params;
+      if (!watched.has(entityId)) {
+        return reply.code(404).send({ error: 'entity is not on the dashboard' });
+      }
+
+      const hours = clampHours(request.query.hours);
+      const end = new Date();
+      const start = new Date(end.getTime() - hours * 3_600_000);
+      const query = new URLSearchParams({
+        filter_entity_id: entityId,
+        end_time: end.toISOString(),
+        minimal_response: '',
+        no_attributes: '',
+      });
+
+      try {
+        const rows = await getJson<HistoryRow[][]>(
+          `${config.ha.baseUrl}/api/history/period/${start.toISOString()}?${query}`,
+          { headers: { Authorization: `Bearer ${config.ha.token}` }, timeoutMs: 8_000 },
+        );
+        const points = (rows[0] ?? []).flatMap((row) => {
+          const value = Number(row.state);
+          const time = row.last_changed ? Date.parse(row.last_changed) : (row.lu ?? 0) * 1000;
+          return Number.isFinite(value) && time > 0 ? [{ t: time, v: value }] : [];
+        });
+        return { entity_id: entityId, points };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        return reply.code(502).send({ error: message });
+      }
+    },
+  );
 
   /**
    * The only write path. It refuses anything not listed in a `controls` panel,

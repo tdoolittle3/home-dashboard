@@ -1,9 +1,16 @@
-import type { ControlAction, EntitySnapshot, HaStatus, Snapshot, SourcesSnapshot } from './types';
+import type { ControlAction, EntitySnapshot, HaStatus, HistoryPoint, Snapshot, SourcesSnapshot } from './types';
 
 export async function fetchSnapshot(): Promise<Snapshot> {
   const response = await fetch('/api/dashboard');
   if (!response.ok) throw new Error(`dashboard request failed: ${response.status}`);
   return (await response.json()) as Snapshot;
+}
+
+export async function fetchHistory(entityId: string, hours: number): Promise<HistoryPoint[]> {
+  const response = await fetch(`/api/history/${encodeURIComponent(entityId)}?hours=${hours}`);
+  if (!response.ok) throw new Error(`history request failed: ${response.status}`);
+  const body = (await response.json()) as { points?: HistoryPoint[] };
+  return body.points ?? [];
 }
 
 export async function sendAction(entityId: string, action: ControlAction): Promise<void> {
