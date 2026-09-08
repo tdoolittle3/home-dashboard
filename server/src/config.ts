@@ -27,6 +27,27 @@ export interface SystemMetricRef extends EntityRef {
   crit?: number;
 }
 
+/**
+ * The five entities the ups-guard publishes via MQTT discovery, by role. The
+ * panel needs to know which is which - runtime is the hero during an outage,
+ * and the problem sensor's attributes carry status, reason and the raw NUT
+ * status string.
+ */
+export interface UpsEntityRefs {
+  /** Battery charge, % - e.g. sensor.ladybird_ups_battery_charge */
+  charge: string;
+  /** Estimated runtime, minutes. */
+  runtime: string;
+  /** Output load, %. */
+  load: string;
+  /** Input voltage, V (nominal 120). */
+  voltage: string;
+  /** Problem binary_sensor; attributes hold status/reason/ups_status. */
+  problem: string;
+}
+
+export const UPS_ROLES = ['charge', 'runtime', 'load', 'voltage', 'problem'] as const;
+
 export type Panel =
   | {
       id: string;
@@ -45,7 +66,8 @@ export type Panel =
       type: 'system';
       /** Host uptime and hardware readings, drawn as stat tiles rather than rows. */
       metrics: SystemMetricRef[];
-    };
+    }
+  | { id: string; title: string; type: 'ups'; entities: UpsEntityRefs };
 
 /** Polled services that get a panel of their own. Each needs its `*_BASE_URL` and key in .env. */
 export const SERVICE_NAMES = ['uptimeKuma', 'jellyfin', 'immich'] as const;
@@ -160,6 +182,15 @@ function loadDashboard(path: string): DashboardConfig {
           throw new Error(`${path}: invalid camera name "${camera.name}" in panel "${panel.id}"`);
         }
       }
+    } else if (panel.type === 'ups') {
+      if (typeof panel.entities !== 'object' || panel.entities === null || Array.isArray(panel.entities)) {
+        throw new Error(`${path}: panel "${panel.id}" needs an "entities" object mapping ${UPS_ROLES.join(', ')}`);
+      }
+      for (const role of UPS_ROLES) {
+        if (!ENTITY_ID.test(panel.entities[role] ?? '')) {
+          throw new Error(`${path}: panel "${panel.id}" has a missing or invalid "${role}" entity_id`);
+        }
+      }
     } else if (panel.type === 'service') {
       if (!(SERVICE_NAMES as readonly string[]).includes(panel.service)) {
         throw new Error(
@@ -200,6 +231,9 @@ export function loadConfig(): AppConfig {
         break;
       case 'system':
         for (const metric of panel.metrics) watched.add(metric.entity_id);
+        break;
+      case 'ups':
+        for (const role of UPS_ROLES) watched.add(panel.entities[role]);
         break;
       case 'cameras':
         for (const camera of panel.cameras) cameras.add(camera.name);

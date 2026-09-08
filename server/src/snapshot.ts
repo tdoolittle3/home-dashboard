@@ -14,6 +14,11 @@ export interface EntitySnapshot {
   deviceClass: string | null;
   icon: string | null;
   lastChanged: string | null;
+  /**
+   * The raw HA attributes. The UPS problem sensor carries its status, reason
+   * and NUT status string here; everything else just gets a small object.
+   */
+  attributes: Record<string, unknown>;
   /** True when the entity is not in HA at all - usually a typo in dashboard.json. */
   missing: boolean;
 }
@@ -48,6 +53,7 @@ export function toEntitySnapshot(entityId: string, state: HassState | null): Ent
       deviceClass: null,
       icon: null,
       lastChanged: null,
+      attributes: {},
       missing: true,
     };
   }
@@ -59,6 +65,7 @@ export function toEntitySnapshot(entityId: string, state: HassState | null): Ent
     deviceClass: attr(state, 'device_class'),
     icon: attr(state, 'icon'),
     lastChanged: state.last_changed ?? null,
+    attributes: state.attributes ?? {},
     missing: false,
   };
 }
