@@ -2,26 +2,39 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CameraRef } from '../types';
 
 interface CameraViewerProps {
-  camera: CameraRef;
+  cameras: CameraRef[];
+  /** Index into `cameras` of the one being shown. */
+  index: number;
+  onSelect: (index: number) => void;
   onClose: () => void;
 }
 
 /** How long a dropped stream stays on its fallback still before reconnecting. */
 const STREAM_RETRY_MS = 5_000;
 
+/** A horizontal move at least this long, and clearly more sideways than down, is a swipe. */
+const SWIPE_MIN_PX = 48;
+
+/** Any less movement than this still counts as a tap. */
+const TAP_MAX_PX = 12;
+
+/** Two taps this close together are a double tap (rewind), not two pause toggles. */
+const DOUBLE_TAP_MS = 300;
+
+/** How far a double tap steps back into the buffered live stream. */
+const REWIND_S = 10;
+
 /*
- * The Fullscreen API is uneven on mobile: iPhone Safari does not offer it for
- * anything but <video>, and older WebKit and Android browsers only ship it with
- * the webkit prefix. So every call goes through these helpers, and where no
- * variant exists the overlay itself fills the viewport instead.
+ * The Fullscreen API is uneven on mobile: iPhone Safari does not offer it at
+ * all for anything but <video>, and older WebKit and Android browsers only
+ * ship it with the webkit prefix. So every call goes through these helpers,
+ * and where no variant exists the overlay itself is the full screen. The
+ * iPhone-only <video>-native player is deliberately not used: it takes over
+ * the whole screen, which would make the swipe and tap gestures unreachable,
+ * and it only exists for cameras whose codec the browser can play.
  */
 interface WebkitElement extends HTMLElement {
   webkitRequestFullscreen?: () => Promise<void> | void;
-}
-
-/** iPhone's only full screen: the native video player, offered on <video> alone. */
-interface WebkitVideoElement extends HTMLVideoElement {
-  webkitEnterFullscreen?: () => void;
 }
 
 interface WebkitDocument extends Document {
@@ -56,25 +69,40 @@ function exitFullscreen(): void {
   void Promise.resolve(exit?.()).catch(() => undefined);
 }
 
+/** Snap a live <video> back to its newest frame, e.g. when resuming from pause. */
+function jumpToLive(video: HTMLVideoElement): void {
+  try {
+    const { seekable } = video;
+    if (seekable.length > 0) {
+      video.currentTime = Math.max(seekable.end(seekable.length - 1) - 0.3, 0);
+    }
+  } catch {
+    // Not seekable (yet); playback just continues from wherever it is.
+  }
+}
+
 /**
- * Full-screen live viewer with no chrome of its own: the tile's expand button
- * opens it straight into browser fullscreen, and leaving fullscreen — or a
- * click/tap or Escape where fullscreen was refused — returns to the dashboard.
+ * Full-screen live viewer, driven by gestures instead of buttons: the tile's
+ * expand button opens it straight into browser fullscreen where the platform
+ * has one (everywhere but iPhone, where the overlay itself fills the screen).
+ *
+ *   tap          pause / resume (resume snaps back to live)
+ *   double tap   rewind ~10 s into the buffered stream, where one exists
+ *   swipe ←/→    previous / next camera
+ *   swipe ↓      close - as do the ✕, Escape, and leaving browser fullscreen
  *
  * The panel thumbnails stay cheap polled stills; only here, where someone is
  * actually watching, does a live connection open. The live element is a real
  * <video> fed by go2rtc through the backend (native HLS on WebKit, endless
  * fMP4 elsewhere); a browser that cannot play the camera's codec, or a camera
  * go2rtc does not carry, drops to the MJPEG stream, and a hidden tab or a
- * dropped MJPEG stream fall back to a still.
- *
- * This is an overlay first and a real Fullscreen API call second: the overlay
- * works everywhere, while browser fullscreen needs a user gesture and is
- * refused in some embedded contexts. On iPhone, where only <video> can go
- * full screen, the native player is tried once the video is ready.
+ * dropped MJPEG stream fall back to a still. Pausing leaves the <video>
+ * mounted so its frozen frame - and the buffer a rewind needs - survive.
  */
-export function CameraViewer({ camera, onClose }: CameraViewerProps) {
+export function CameraViewer({ cameras, index, onSelect, onClose }: CameraViewerProps) {
+  const camera = cameras[index];
   const [tick, setTick] = useState(() => Date.now());
+  const [paused, setPaused] = useState(false);
   const [hidden, setHidden] = useState(() => document.visibilityState === 'hidden');
   const [streamDown, setStreamDown] = useState(false);
   // A browser that cannot play the camera's codec (or a camera go2rtc does not
@@ -82,15 +110,68 @@ export function CameraViewer({ camera, onClose }: CameraViewerProps) {
   const [videoDown, setVideoDown] = useState(false);
   // Bumped to force a new connection when the stream needs a reconnect.
   const [streamKey, setStreamKey] = useState(0);
+  // A short confirmation ("‹ 10s") after a gesture with no visible effect of its own.
+  const [toast, setToast] = useState<string | null>(null);
 
   const overlayRef = useRef<HTMLDivElement | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
   // Whether browser fullscreen was actually entered, so that only a real
   // fullscreen exit closes the viewer - not the initial request being refused.
   const enteredFullscreenRef = useRef(false);
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
+  const pausedRef = useRef(paused);
+  pausedRef.current = paused;
+
+  const pointerStartRef = useRef<{ x: number; y: number } | null>(null);
+  const lastTapRef = useRef(0);
+  const tapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const streaming = !hidden && !streamDown;
+
+  const togglePaused = useCallback(() => {
+    const next = !pausedRef.current;
+    const video = videoRef.current;
+    if (video) {
+      if (next) {
+        video.pause();
+      } else {
+        jumpToLive(video);
+        void video.play().catch(() => undefined);
+      }
+    }
+    // The MJPEG and still fallbacks freeze/thaw on a frame fetched now.
+    setTick(Date.now());
+    setPaused(next);
+  }, []);
+
+  const rewind = useCallback(() => {
+    const video = videoRef.current;
+    if (!video) return; // MJPEG and stills have no buffer to step back into.
+    try {
+      const { seekable } = video;
+      if (seekable.length === 0) return;
+      const target = Math.max(video.currentTime - REWIND_S, seekable.start(0) + 0.25);
+      if (target >= video.currentTime - 0.5) return; // already at the buffer's edge
+      video.currentTime = target;
+      setToast(`‹ ${Math.round(video.currentTime - target) || REWIND_S}s`);
+    } catch {
+      // Seeking a live stream is best-effort; at worst nothing happens.
+    }
+  }, []);
+
+  const step = useCallback(
+    (delta: number) => {
+      if (cameras.length < 2) return;
+      // Wrap in both directions so swiping never dead-ends.
+      onSelect((index + delta + cameras.length) % cameras.length);
+      setTick(Date.now());
+      setPaused(false);
+      setStreamDown(false);
+      setVideoDown(false);
+    },
+    [cameras.length, index, onSelect],
+  );
 
   // A hidden tab must not keep Frigate encoding; dropping to the still closes
   // the stream connection, and coming back reopens it. The still is fetched as
@@ -113,6 +194,20 @@ export function CameraViewer({ camera, onClose }: CameraViewerProps) {
     }, STREAM_RETRY_MS);
     return () => clearTimeout(timer);
   }, [streamDown]);
+
+  // The rewind confirmation fades on its own.
+  useEffect(() => {
+    if (toast === null) return;
+    const timer = setTimeout(() => setToast(null), 900);
+    return () => clearTimeout(timer);
+  }, [toast]);
+
+  // Any pending single-tap must not fire after the viewer is gone.
+  useEffect(() => {
+    return () => {
+      if (tapTimerRef.current) clearTimeout(tapTimerRef.current);
+    };
+  }, []);
 
   // Move focus in on open and hand it back to the trigger on close, so keyboard
   // users are not dropped at the top of the document.
@@ -155,9 +250,9 @@ export function CameraViewer({ camera, onClose }: CameraViewerProps) {
 
   // Straight into browser fullscreen: the click on the tile's expand button is
   // still a fresh user activation when this mounts, so the request is honoured.
-  // Once entered, leaving fullscreen (Escape, F11, a platform gesture) is the
-  // way back to the dashboard, so an exit closes the overlay. Prefixed WebKit
-  // fires webkitfullscreenchange instead of the standard event.
+  // Once entered, leaving fullscreen (Escape, F11, a platform gesture) is a way
+  // back to the dashboard, so an exit closes the overlay. Prefixed WebKit fires
+  // webkitfullscreenchange instead of the standard event.
   useEffect(() => {
     const node = overlayRef.current;
     if (FULLSCREEN_SUPPORTED && node) requestFullscreenOn(node);
@@ -188,66 +283,131 @@ export function CameraViewer({ camera, onClose }: CameraViewerProps) {
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return;
-      // While in browser fullscreen the first Escape exits that; let the
-      // browser handle it, and the fullscreen-change handler closes the rest.
-      if (currentFullscreenElement()) return;
-      event.preventDefault();
-      close();
+      if (event.key === 'Escape') {
+        // While in browser fullscreen the first Escape exits that; let the
+        // browser handle it, and the fullscreen-change handler closes the rest.
+        if (currentFullscreenElement()) return;
+        event.preventDefault();
+        close();
+      } else if (event.key === 'ArrowRight') {
+        event.preventDefault();
+        step(1);
+      } else if (event.key === 'ArrowLeft') {
+        event.preventDefault();
+        step(-1);
+      } else if (event.key === ' ' || event.key === 'Spacebar') {
+        event.preventDefault();
+        togglePaused();
+      }
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
-  }, [close]);
+  }, [close, step, togglePaused]);
 
-  // iPhone: no Fullscreen API for the overlay, but the <video> can enter the
-  // native player once it has media. The attempt rides on whatever remains of
-  // the opening tap's activation - if that has lapsed the overlay, which
-  // already fills the viewport, is the full screen. Closing the native player
-  // hands back to the dashboard.
-  const attachVideo = useCallback((node: HTMLVideoElement | null) => {
-    if (!node || FULLSCREEN_SUPPORTED) return;
-    const video = node as WebkitVideoElement;
-    if (!video.webkitEnterFullscreen) return;
-    node.addEventListener(
-      'loadedmetadata',
-      () => {
-        try {
-          video.webkitEnterFullscreen?.();
-        } catch {
-          // Activation expired or player unavailable; the overlay stands.
-        }
-      },
-      { once: true },
-    );
-    node.addEventListener('webkitendfullscreen', () => onCloseRef.current(), { once: true });
-  }, []);
+  // One pointer pipeline for touch and mouse alike: where the pointer went
+  // down and came up decides between swipe, tap and double tap. The single
+  // tap waits out the double-tap window so a rewind is not also a pause.
+  const onPointerDown = (event: React.PointerEvent) => {
+    if (!event.isPrimary) return;
+    pointerStartRef.current = { x: event.clientX, y: event.clientY };
+  };
+
+  const onPointerUp = (event: React.PointerEvent) => {
+    const start = pointerStartRef.current;
+    pointerStartRef.current = null;
+    if (!start || !event.isPrimary) return;
+    const dx = event.clientX - start.x;
+    const dy = event.clientY - start.y;
+    const absX = Math.abs(dx);
+    const absY = Math.abs(dy);
+
+    if (absX >= SWIPE_MIN_PX && absX > absY * 1.5) {
+      step(dx < 0 ? 1 : -1);
+      return;
+    }
+    if (dy >= SWIPE_MIN_PX * 1.5 && absY > absX * 1.5) {
+      close();
+      return;
+    }
+    if (absX > TAP_MAX_PX || absY > TAP_MAX_PX) return; // a drag that settled nowhere
+
+    const now = performance.now();
+    if (now - lastTapRef.current < DOUBLE_TAP_MS) {
+      lastTapRef.current = 0;
+      if (tapTimerRef.current) {
+        clearTimeout(tapTimerRef.current);
+        tapTimerRef.current = null;
+      }
+      rewind();
+    } else {
+      lastTapRef.current = now;
+      tapTimerRef.current = setTimeout(() => {
+        tapTimerRef.current = null;
+        togglePaused();
+      }, DOUBLE_TAP_MS);
+    }
+  };
+
+  if (!camera) return null;
 
   const label = camera.label ?? camera.name;
+  // The <video> stays mounted while paused: its frozen frame is the pause
+  // display, and its buffer is what a rewind steps back into.
+  const showVideo = streaming && !videoDown;
+  const showMjpeg = streaming && videoDown && !paused;
 
   return (
-    // Any click or tap is the way out - the viewer has no controls of its own.
     <div
       className="viewer"
       ref={overlayRef}
       role="dialog"
       aria-modal="true"
-      aria-label={`${label} camera - click or press Escape to close`}
+      aria-label={`${label} camera - tap to pause, double-tap to rewind, swipe to switch cameras`}
       tabIndex={-1}
-      onClick={close}
+      onPointerDown={onPointerDown}
+      onPointerUp={onPointerUp}
     >
+      <div className="viewer__meta">
+        <span className="viewer__name">{label}</span>
+        {paused ? (
+          <span className="pill">paused</span>
+        ) : streamDown ? (
+          <span className="pill">reconnecting</span>
+        ) : (
+          <span className="pill pill--live">live</span>
+        )}
+      </div>
+
+      <button
+        type="button"
+        className="viewer__close"
+        aria-label="Close"
+        onClick={close}
+        // A press on the ✕ must not double as a tap-to-pause on the overlay.
+        onPointerDown={(event) => event.stopPropagation()}
+        onPointerUp={(event) => event.stopPropagation()}
+      >
+        ✕
+      </button>
+
       <figure className="viewer__frame">
-        {streaming && !videoDown ? (
+        {showVideo ? (
           <video
             key={`video-${camera.name}-${streamKey}`}
-            ref={attachVideo}
+            ref={videoRef}
             src={`/api/camera/${camera.name}/${NATIVE_HLS ? 'live.m3u8' : 'live.mp4'}?k=${streamKey}`}
             autoPlay
             muted
             playsInline
             aria-label={`Live view of ${label}`}
+            // Coming back from a hidden tab remounts the video; a viewer that
+            // was paused must not silently resume.
+            onLoadedMetadata={(event) => {
+              if (pausedRef.current) event.currentTarget.pause();
+            }}
             onError={() => setVideoDown(true)}
           />
-        ) : streaming ? (
+        ) : showMjpeg ? (
           <img
             key={`stream-${camera.name}-${streamKey}`}
             src={`/api/camera/${camera.name}/stream?h=1080&fps=5&k=${streamKey}`}
@@ -261,6 +421,20 @@ export function CameraViewer({ camera, onClose }: CameraViewerProps) {
           <img src={`/api/camera/${camera.name}/snapshot?h=1080&t=${tick}`} alt={`Latest still from ${label}`} />
         )}
       </figure>
+
+      {toast !== null ? (
+        <span className="viewer__toast" aria-live="polite">
+          {toast}
+        </span>
+      ) : null}
+
+      {cameras.length > 1 ? (
+        <div className="viewer__dots" aria-hidden="true">
+          {cameras.map((entry, dot) => (
+            <span key={entry.name} className={dot === index ? 'viewer__dot viewer__dot--active' : 'viewer__dot'} />
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }
