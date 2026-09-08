@@ -146,12 +146,34 @@ export function CameraViewer({ cameras, index, onSelect, onClose }: CameraViewer
     return () => previous?.focus();
   }, []);
 
-  // The page behind the overlay must not scroll while it is open.
+  // The page behind the overlay must not scroll while it is open. overflow:
+  // hidden on the body is not enough: iOS Safari ignores it as a scroll lock,
+  // and after rotating the phone with it applied can leave the page stuck
+  // unscrollable even once it is removed. Pinning the body with position:
+  // fixed is the lock WebKit honours; the negative top keeps the page from
+  // visually jumping, and close puts the scroll position back.
   useEffect(() => {
-    const original = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
+    const { style } = document.body;
+    const scrollY = window.scrollY;
+    const original = {
+      position: style.position,
+      top: style.top,
+      left: style.left,
+      right: style.right,
+      overflow: style.overflow,
+    };
+    style.position = 'fixed';
+    style.top = `-${scrollY}px`;
+    style.left = '0';
+    style.right = '0';
+    style.overflow = 'hidden';
     return () => {
-      document.body.style.overflow = original;
+      style.position = original.position;
+      style.top = original.top;
+      style.left = original.left;
+      style.right = original.right;
+      style.overflow = original.overflow;
+      window.scrollTo(0, scrollY);
     };
   }, []);
 
