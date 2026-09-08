@@ -87,7 +87,10 @@ body {
 .shell {
   max-width: 1280px;
   margin: 0 auto;
-  padding: 22px 20px 56px;
+  /* Run standalone from a phone's home screen, the page draws under the
+     status bar and home indicator; the safe-area maxima keep clear of both. */
+  padding: max(22px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) max(56px, env(safe-area-inset-bottom))
+    max(20px, env(safe-area-inset-left));
 }
 
 /* --- top bar --- */
@@ -1256,7 +1259,8 @@ body {
 
 @media (max-width: 560px) {
   .shell {
-    padding: 16px 14px 44px;
+    padding: max(16px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right))
+      max(44px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left));
   }
 
   .topbar h1 {
