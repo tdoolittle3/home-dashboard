@@ -984,7 +984,7 @@ body {
 
 /* --- full-screen camera viewer --- */
 
-/* The picture owns the whole screen; the controls and hint float over it. */
+/* The picture owns the whole screen; any click on the overlay closes it. */
 .viewer {
   position: fixed;
   inset: 0;
@@ -993,65 +993,8 @@ body {
   animation: fade var(--motion-fast) var(--ease) both;
 }
 
-.viewer__bar {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
-  /* Safe-area maxima keep the controls out of a phone notch in either orientation. */
-  padding: max(10px, env(safe-area-inset-top)) max(14px, env(safe-area-inset-right)) 12px
-    max(14px, env(safe-area-inset-left));
-  /* Legible over any frame, faded out before the picture's middle. */
-  background: linear-gradient(to bottom, rgb(0 0 0 / 0.72), rgb(0 0 0 / 0.35) 55%, transparent);
-}
-
-.viewer__title {
-  font-size: var(--fs-xl);
-  font-weight: 600;
-}
-
-.viewer__actions {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.viewer__btn {
-  font: inherit;
-  font-size: 13px;
-  color: var(--text);
-  background: color-mix(in srgb, var(--surface-raised) 85%, transparent);
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 5px 12px;
-  cursor: pointer;
-  transition: border-color var(--motion-fast) var(--ease);
-}
-
-.viewer__btn:hover {
-  border-color: var(--accent);
-}
-
-.viewer__btn:focus-visible {
+.viewer:focus-visible {
   outline: none;
-  box-shadow: var(--focus-ring);
-}
-
-.viewer__btn--close {
-  border-color: color-mix(in srgb, var(--down) 45%, transparent);
-}
-
-.viewer__count {
-  color: var(--text-dim);
-  font-size: var(--fs-sm);
-  font-variant-numeric: tabular-nums;
 }
 
 .viewer__frame {
@@ -1068,19 +1011,6 @@ body {
   width: 100%;
   height: 100%;
   object-fit: contain;
-}
-
-.viewer__hint {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: max(10px, env(safe-area-inset-bottom));
-  z-index: 1;
-  margin: 0;
-  text-align: center;
-  color: var(--idle);
-  font-size: var(--fs-sm);
-  text-shadow: 0 1px 3px rgb(0 0 0 / 0.9);
 }
 
 /* --- on/off switch --- */
@@ -1272,10 +1202,6 @@ body {
 
   .row--control .row__meta {
     display: block;
-  }
-
-  .viewer__hint {
-    display: none;
   }
 }
 

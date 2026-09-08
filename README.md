@@ -139,9 +139,9 @@ are missing rather than rendering empty:
 The compact **Services** strip in the side column keeps one tile per service regardless, so the
 detail panels can be dropped from the config without losing the up/down view.
 
-`cameras` panels render polled stills. Clicking one opens a full-screen viewer that asks the proxy
-for a 1080px frame — the ceiling it allows — with pause, manual refresh, camera switching and real
-browser fullscreen. Escape closes it; the arrow keys move between cameras.
+`cameras` panels render polled stills. Clicking one goes straight into real browser fullscreen —
+the viewer asks the proxy for a 1080px frame, the ceiling it allows — with no controls of its own.
+Leaving fullscreen, clicking anywhere, or Escape returns to the dashboard.
 
 The Services panel draws the largest filesystem Frigate reports as a used/free pie. Paths that share
 a filesystem report identical figures, so they are grouped rather than charted twice; the small
