@@ -62,7 +62,9 @@ export function CamerasPanel({ title, cameras, refreshSeconds, stillHeight = 360
         ))}
       </div>
 
-      {viewing !== null ? <CameraViewer camera={cameras[viewing]} onClose={() => setViewing(null)} /> : null}
+      {viewing !== null ? (
+        <CameraViewer cameras={cameras} index={viewing} onSelect={setViewing} onClose={() => setViewing(null)} />
+      ) : null}
     </Panel>
   );
 }
