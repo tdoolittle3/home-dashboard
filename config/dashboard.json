@@ -30,8 +30,8 @@
         { "entity_id": "sensor.system_monitor_processor_use", "name": "CPU", "kind": "percent", "warn": 80, "crit": 95 },
         { "entity_id": "sensor.system_monitor_memory_usage", "name": "Memory", "kind": "percent", "warn": 85, "crit": 95 },
         { "entity_id": "sensor.system_monitor_swap_usage", "name": "Swap", "kind": "percent", "warn": 40, "crit": 75 },
-        { "entity_id": "sensor.system_monitor_processor_temperature", "name": "CPU temp", "warn": 85, "crit": 95 },
-        { "entity_id": "sensor.ladybird_storage_nvme_temperature", "name": "NVMe temp", "warn": 65, "crit": 75 },
+        { "entity_id": "sensor.system_monitor_processor_temperature", "name": "CPU temp", "warn": 176, "crit": 194 },
+        { "entity_id": "sensor.ladybird_storage_nvme_temperature", "name": "NVMe temp", "warn": 140, "crit": 158 },
         { "entity_id": "sensor.system_monitor_load_1_min", "name": "Load (1 min)", "warn": 12, "crit": 16 },
         { "entity_id": "sensor.system_monitor_network_throughput_in_enp44s0", "name": "Network in" },
         { "entity_id": "sensor.system_monitor_network_throughput_out_enp44s0", "name": "Network out" }
