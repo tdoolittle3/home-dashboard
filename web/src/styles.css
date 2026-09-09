@@ -987,100 +987,17 @@ body {
 
 /* --- full-screen camera viewer --- */
 
-/* The picture owns the whole screen; taps and swipes on the overlay drive it,
-   so the browser must not claim them for scrolling or double-tap zoom. */
+/* The picture owns the whole screen; any click on the overlay closes it. */
 .viewer {
   position: fixed;
   inset: 0;
   z-index: 50;
   background: #000;
   animation: fade var(--motion-fast) var(--ease) both;
-  touch-action: none;
-  user-select: none;
-  -webkit-user-select: none;
 }
 
 .viewer:focus-visible {
   outline: none;
-}
-
-/* Camera name and live/paused state, small and out of the picture's way. */
-.viewer__meta {
-  position: absolute;
-  z-index: 1;
-  top: max(10px, env(safe-area-inset-top));
-  left: max(14px, env(safe-area-inset-left));
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.viewer__name {
-  font-size: var(--fs-md);
-  font-weight: 600;
-  text-shadow: 0 1px 3px rgb(0 0 0 / 0.9);
-}
-
-.viewer__close {
-  position: absolute;
-  z-index: 1;
-  top: max(10px, env(safe-area-inset-top));
-  right: max(14px, env(safe-area-inset-right));
-  width: 34px;
-  height: 34px;
-  display: grid;
-  place-items: center;
-  font: inherit;
-  font-size: 15px;
-  line-height: 1;
-  color: var(--text);
-  background: rgb(0 0 0 / 0.45);
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  cursor: pointer;
-}
-
-.viewer__close:focus-visible {
-  outline: none;
-  box-shadow: var(--focus-ring);
-}
-
-/* Short confirmation for gestures with no visible effect of their own (rewind). */
-.viewer__toast {
-  position: absolute;
-  z-index: 1;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  padding: 8px 16px;
-  font-size: var(--fs-xl);
-  background: rgb(0 0 0 / 0.55);
-  border-radius: 999px;
-  pointer-events: none;
-}
-
-/* One dot per camera, the current one lit - the swipe affordance. */
-.viewer__dots {
-  position: absolute;
-  z-index: 1;
-  left: 0;
-  right: 0;
-  bottom: max(12px, env(safe-area-inset-bottom));
-  display: flex;
-  justify-content: center;
-  gap: 8px;
-  pointer-events: none;
-}
-
-.viewer__dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: rgb(255 255 255 / 0.35);
-}
-
-.viewer__dot--active {
-  background: var(--text);
 }
 
 .viewer__frame {
