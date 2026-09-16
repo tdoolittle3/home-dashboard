@@ -9,6 +9,7 @@
     "A 'system' panel draws host readings as tiles. 'kind' is uptime | percent | value (inferred when omitted); 'warn' and 'crit' are thresholds the reading is compared against.",
     "A 'ups' panel draws the rack UPS as a battery gauge. Its 'entities' object maps the five roles (charge, runtime, load, voltage, problem) to the ladybird_ups MQTT discovery entities; the problem sensor's attributes drive the ok/warning/critical look.",
     "The sensor.system_monitor_* ids need HA's System Monitor integration (Settings -> Devices & services -> Add -> System Monitor). Ids not in HA show as 'not in HA' rather than hiding.",
+    "The 'links' URLs use the Tailscale MagicDNS name ladybird.tail0e6756.ts.net so they open from any tailnet device, not just the LAN. Frigate points at its unauthenticated port 5000 rather than 8971, which would ask for a login.",
     "Find entity ids in Home Assistant under Developer tools -> States."
   ],
   "panels": [
@@ -91,10 +92,10 @@
     }
   ],
   "links": [
-    { "label": "Home Assistant", "url": "http://192.168.0.13:8123" },
-    { "label": "Frigate", "url": "https://192.168.0.13:8971" },
-    { "label": "Jellyfin", "url": "http://192.168.0.13:8096" },
-    { "label": "Uptime Kuma", "url": "http://192.168.0.13:3001" },
-    { "label": "Immich", "url": "http://192.168.0.13:2283" }
+    { "label": "Home Assistant", "url": "http://ladybird.tail0e6756.ts.net:8123" },
+    { "label": "Frigate", "url": "http://ladybird.tail0e6756.ts.net:5000" },
+    { "label": "Jellyfin", "url": "http://ladybird.tail0e6756.ts.net:8096" },
+    { "label": "Uptime Kuma", "url": "http://ladybird.tail0e6756.ts.net:3001" },
+    { "label": "Immich", "url": "http://ladybird.tail0e6756.ts.net:2283" }
   ]
 }

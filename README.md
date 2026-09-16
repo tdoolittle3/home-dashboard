@@ -221,6 +221,18 @@ the `"80:8099"` mapping in the compose file — so `http://ladybird/` needs no p
 else on the host listens on 80. The name resolves through Tailscale MagicDNS on tailnet devices;
 on the LAN without Tailscale use `http://ladybird.local/` (mDNS) or the IP.
 
+### Service links
+
+The `links` array in `config/dashboard.json` is the only browser-facing set of URLs — everything
+else the server fetches, it fetches from inside the host. Those links use the full MagicDNS name
+`ladybird.tail0e6756.ts.net` rather than `192.168.0.13`, so they open from a phone on cell data the
+same as from the couch. The bare `ladybird` would also resolve on most tailnet devices, but the FQDN
+does not depend on the tailnet search domain being applied.
+
+Frigate is linked on **5000**, its unauthenticated port, not the `8971` TLS port that prompts for a
+login. Both are published on the host, and 5000 is the same port the dashboard's own camera proxy
+already talks to — the link is no more exposure than the dashboard itself.
+
 ---
 
 ## Verified in the container on ladybird (2026-09-05)
