@@ -82,10 +82,25 @@ export interface HistoryPoint {
   v: number;
 }
 
+/** The built-in Services tiles a link can attach its URL to. Mirrors TILE_SERVICES in server/src/config.ts. */
+export type TileService = 'ha' | 'frigate' | 'jellyfin' | 'uptimeKuma' | 'immich';
+
+/**
+ * One entry of the Services panel. With `service` set, the URL lands on that
+ * built-in tile; without it, the entry is a generic link tile, with an up/down
+ * dot when the server pings its `health` url.
+ */
+export interface ServiceLink {
+  label: string;
+  url: string;
+  service?: TileService;
+  health?: string;
+}
+
 export interface DashboardConfig {
   title: string;
   panels: Panel[];
-  links: { label: string; url: string }[];
+  links: ServiceLink[];
 }
 
 export type SourceResult<T> = { ok: true; data: T } | { ok: false; error: string };
@@ -199,11 +214,21 @@ export interface ImmichSummary {
   } | null;
 }
 
+export interface LinkHealth {
+  label: string;
+  up: boolean;
+  status: number | null;
+  latencyMs: number | null;
+  error: string | null;
+}
+
 export interface SourcesSnapshot {
   frigate: SourceResult<FrigateSummary> | null;
   jellyfin: SourceResult<JellyfinSummary> | null;
   uptimeKuma: SourceResult<KumaSummary> | null;
   immich: SourceResult<ImmichSummary> | null;
+  /** Liveness pings for the generic link tiles; null when no link has a health url. */
+  linkHealth: SourceResult<LinkHealth[]> | null;
 }
 
 export interface Snapshot {

@@ -4,6 +4,7 @@ import { createFrigateSource, type FrigateSummary } from './sources/frigate.js';
 import { cached, toResult, type SourceResult } from './sources/http.js';
 import { createImmichSource, type ImmichSummary } from './sources/immich.js';
 import { createJellyfinSource, type JellyfinSummary } from './sources/jellyfin.js';
+import { createLinkHealthSource, type LinkHealth } from './sources/linkHealth.js';
 import { createUptimeKumaSource, type KumaSummary } from './sources/uptimeKuma.js';
 
 export interface EntitySnapshot {
@@ -28,6 +29,8 @@ export interface SourcesSnapshot {
   jellyfin: SourceResult<JellyfinSummary> | null;
   uptimeKuma: SourceResult<KumaSummary> | null;
   immich: SourceResult<ImmichSummary> | null;
+  /** Liveness pings for the generic link tiles; null when no link has a health url. */
+  linkHealth: SourceResult<LinkHealth[]> | null;
 }
 
 export interface Snapshot {
@@ -82,6 +85,7 @@ export class SnapshotBuilder {
   #jellyfin: (() => Promise<SourceResult<JellyfinSummary>>) | null;
   #uptimeKuma: (() => Promise<SourceResult<KumaSummary>>) | null;
   #immich: (() => Promise<SourceResult<ImmichSummary>>) | null;
+  #linkHealth: (() => Promise<SourceResult<LinkHealth[]>>) | null;
 
   constructor(config: AppConfig, ha: HaClient) {
     this.#config = config;
@@ -99,6 +103,10 @@ export class SnapshotBuilder {
     this.#jellyfin = jellyfinSource ? cached(ttl, () => toResult('jellyfin', jellyfinSource)) : null;
     this.#uptimeKuma = kumaSource ? cached(ttl, () => toResult('uptime-kuma', kumaSource)) : null;
     this.#immich = immichSource ? cached(ttl, () => toResult('immich', immichSource)) : null;
+
+    const healthLinks = config.dashboard.links.filter((link) => link.health !== undefined);
+    const linkHealthSource = healthLinks.length > 0 ? createLinkHealthSource(healthLinks) : null;
+    this.#linkHealth = linkHealthSource ? cached(ttl, () => toResult('link-health', linkHealthSource)) : null;
   }
 
   entities(): Record<string, EntitySnapshot> {
@@ -110,13 +118,14 @@ export class SnapshotBuilder {
   }
 
   async sources(): Promise<SourcesSnapshot> {
-    const [frigate, jellyfin, uptimeKuma, immich] = await Promise.all([
+    const [frigate, jellyfin, uptimeKuma, immich, linkHealth] = await Promise.all([
       this.#frigate ? this.#frigate() : Promise.resolve(null),
       this.#jellyfin ? this.#jellyfin() : Promise.resolve(null),
       this.#uptimeKuma ? this.#uptimeKuma() : Promise.resolve(null),
       this.#immich ? this.#immich() : Promise.resolve(null),
+      this.#linkHealth ? this.#linkHealth() : Promise.resolve(null),
     ]);
-    return { frigate, jellyfin, uptimeKuma, immich };
+    return { frigate, jellyfin, uptimeKuma, immich, linkHealth };
   }
 
   async build(): Promise<Snapshot> {

@@ -11,7 +11,8 @@
     "An 'adsb' panel embeds the tar1090 map and polls its aircraft.json. 'baseHost' is the one place the receiver's host:port lives - the iframe, the poll and the full-map link all build on it. The browser talks to it directly, so use a name that resolves over Tailscale (ladybird or ladybird.<tailnet>.ts.net), never a LAN IP.",
     "The sensor.system_monitor_* ids need HA's System Monitor integration (Settings -> Devices & services -> Add -> System Monitor). Ids not in HA show as 'not in HA' rather than hiding.",
     "The 'links' URLs use the Tailscale MagicDNS name ladybird.tail0e6756.ts.net so they open from any tailnet device, not just the LAN. Frigate points at its unauthenticated port 5000 rather than 8971, which would ask for a login.",
-    "Find entity ids in Home Assistant under Developer tools -> States."
+    "Find entity ids in Home Assistant under Developer tools -> States.",
+    "'links' are the Services panel tiles (the topbar carries no links). An entry with 'service' (ha, frigate, jellyfin, uptimeKuma, immich) puts its url on that built-in tile, which already has live status. An entry without 'service' is a generic link tile; give it 'health' - a url the SERVER can reach (LAN IP, since it pings from inside the container) - and the tile gets a live up/down dot. 'url' stays browser-facing (the ts.net FQDN)."
   ],
   "panels": [
     {
@@ -100,10 +101,12 @@
     }
   ],
   "links": [
-    { "label": "Home Assistant", "url": "http://ladybird.tail0e6756.ts.net:8123" },
-    { "label": "Frigate", "url": "http://ladybird.tail0e6756.ts.net:5000" },
-    { "label": "Jellyfin", "url": "http://ladybird.tail0e6756.ts.net:8096" },
-    { "label": "Uptime Kuma", "url": "http://ladybird.tail0e6756.ts.net:3001" },
-    { "label": "Immich", "url": "http://ladybird.tail0e6756.ts.net:2283" }
+    { "label": "Home Assistant", "url": "http://ladybird.tail0e6756.ts.net:8123", "service": "ha" },
+    { "label": "Frigate", "url": "http://ladybird.tail0e6756.ts.net:5000", "service": "frigate" },
+    { "label": "Jellyfin", "url": "http://ladybird.tail0e6756.ts.net:8096", "service": "jellyfin" },
+    { "label": "Uptime Kuma", "url": "http://ladybird.tail0e6756.ts.net:3001", "service": "uptimeKuma" },
+    { "label": "Immich", "url": "http://ladybird.tail0e6756.ts.net:2283", "service": "immich" },
+    { "label": "n8n", "url": "http://ladybird.tail0e6756.ts.net:5678", "health": "http://192.168.0.13:5678/" },
+    { "label": "Flights", "url": "http://ladybird.tail0e6756.ts.net:8080", "health": "http://192.168.0.13:8080/" }
   ]
 }
