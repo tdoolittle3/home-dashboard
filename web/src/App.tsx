@@ -121,16 +121,6 @@ export function App() {
             <span className="topbar__meta">updated {formatRelative(snapshot.generatedAt)}</span>
           </div>
         </div>
-        <nav className="topbar__links" aria-label="Open a service">
-          {dashboard.links.map((link) => (
-            <a key={link.url} className="chip" href={link.url} target="_blank" rel="noreferrer">
-              {link.label}
-              <span className="chip__arrow" aria-hidden="true">
-                ↗
-              </span>
-            </a>
-          ))}
-        </nav>
       </header>
 
       {cameraPanels.length > 0 ? <div className="hero">{cameraPanels.map(renderPanel)}</div> : null}
@@ -138,7 +128,7 @@ export function App() {
       <div className={mainPanels.length > 0 ? 'layout' : 'layout layout--single'}>
         <div className="layout__side">
           {sidePanels.map(renderPanel)}
-          <ServicesPanel ha={ha} sources={sources} />
+          <ServicesPanel ha={ha} sources={sources} links={dashboard.links} />
         </div>
         {mainPanels.length > 0 ? <div className="layout__main">{mainPanels.map(renderPanel)}</div> : null}
       </div>

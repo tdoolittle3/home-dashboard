@@ -87,10 +87,29 @@ export type Panel =
 export const SERVICE_NAMES = ['uptimeKuma', 'jellyfin', 'immich'] as const;
 export type ServiceName = (typeof SERVICE_NAMES)[number];
 
+/** The built-in Services tiles a link can attach its URL to. */
+export const TILE_SERVICES = ['ha', 'frigate', 'jellyfin', 'uptimeKuma', 'immich'] as const;
+export type TileService = (typeof TILE_SERVICES)[number];
+
+/**
+ * One entry of the Services panel. With `service` set, the URL lands on that
+ * built-in tile (which already has live status from its own poller). Without
+ * it, the entry becomes a generic link tile; `health` is a URL the server pings
+ * for the tile's up/down dot. `health` is separate from `url` on purpose: `url`
+ * is what the browser opens (the Tailscale FQDN), `health` is what the server
+ * can reach from inside the container (the LAN address).
+ */
+export interface ServiceLink {
+  label: string;
+  url: string;
+  service?: TileService;
+  health?: string;
+}
+
 export interface DashboardConfig {
   title: string;
   panels: Panel[];
-  links: { label: string; url: string }[];
+  links: ServiceLink[];
 }
 
 export interface AppConfig {
@@ -139,6 +158,7 @@ const ENTITY_ID = /^[a-z_]+\.[a-z0-9_]+$/;
 const METRIC_KINDS = new Set<string>(['uptime', 'percent', 'value']);
 /** A bare hostname or host:port; the frontend builds http:// URLs on it verbatim. */
 const HOST_PORT = /^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?(?::\d{1,5})?$/i;
+const HTTP_URL = /^https?:\/\//;
 
 function loadDashboard(path: string): DashboardConfig {
   const raw = readFileSync(resolve(path), 'utf8');
@@ -230,10 +250,28 @@ function loadDashboard(path: string): DashboardConfig {
     }
   }
 
+  const links = Array.isArray(parsed.links) ? parsed.links : [];
+  const linkLabels = new Set<string>();
+  for (const link of links) {
+    if (!link.label || !HTTP_URL.test(link.url ?? '')) {
+      throw new Error(`${path}: every link needs a "label" and an http(s) "url"`);
+    }
+    if (linkLabels.has(link.label)) throw new Error(`${path}: duplicate link label "${link.label}"`);
+    linkLabels.add(link.label);
+    if (link.service !== undefined && !(TILE_SERVICES as readonly string[]).includes(link.service)) {
+      throw new Error(
+        `${path}: link "${link.label}" has unknown service "${link.service}" - one of ${TILE_SERVICES.join(', ')}`,
+      );
+    }
+    if (link.health !== undefined && !HTTP_URL.test(link.health)) {
+      throw new Error(`${path}: link "${link.label}" has a non-http(s) "health" url`);
+    }
+  }
+
   return {
     title: parsed.title ?? 'Home',
     panels: parsed.panels,
-    links: Array.isArray(parsed.links) ? parsed.links : [],
+    links,
   };
 }
 

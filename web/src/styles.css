@@ -150,53 +150,6 @@ body {
   font-size: var(--fs-sm);
 }
 
-.topbar__links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 12px;
-  border-radius: 999px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  color: var(--text-dim);
-  font-size: 13px;
-  text-decoration: none;
-  transition:
-    color var(--motion-fast) var(--ease),
-    background var(--motion-fast) var(--ease),
-    border-color var(--motion-fast) var(--ease),
-    transform var(--motion-fast) var(--ease);
-}
-
-.chip:hover {
-  color: var(--text);
-  background: var(--surface-raised);
-  border-color: var(--border-strong);
-  transform: translateY(-1px);
-}
-
-.chip:focus-visible {
-  outline: none;
-  color: var(--text);
-  box-shadow: var(--focus-ring);
-}
-
-.chip__arrow {
-  font-size: var(--fs-xs);
-  color: var(--idle);
-  transition: color var(--motion-fast) var(--ease);
-}
-
-.chip:hover .chip__arrow {
-  color: var(--accent);
-}
-
 .pill {
   display: inline-flex;
   align-items: center;
@@ -418,6 +371,38 @@ body {
 .tile:hover {
   border-color: var(--border-strong);
   transform: translateY(-1px);
+}
+
+/* The tile as the way in: the whole surface is the anchor, and the corner
+   arrow (the affordance the topbar chips used to carry) says it leaves the
+   page. Text stays the tile's own colours - a wall of accent-blue names would
+   read as a link list, not a status board. */
+.tile--link {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.tile--link:hover {
+  border-color: var(--accent);
+}
+
+.tile--link:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.tile__arrow {
+  margin-left: auto;
+  font-size: var(--fs-xs);
+  color: var(--idle);
+  transition: color var(--motion-fast) var(--ease);
+}
+
+.tile--link:hover .tile__arrow,
+.tile--link:focus-visible .tile__arrow {
+  color: var(--accent);
 }
 
 /* Not configured is a resting state, not a fault: the tile drops its fill
