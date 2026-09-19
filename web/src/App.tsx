@@ -1,3 +1,4 @@
+import { AdsbPanel } from './components/AdsbPanel';
 import { CamerasPanel } from './components/CamerasPanel';
 import { ControlsPanel } from './components/ControlsPanel';
 import { EntitiesPanel } from './components/EntitiesPanel';
@@ -82,6 +83,16 @@ export function App() {
     }
     if (panel.type === 'ups') {
       return <UpsPanel key={panel.id} title={panel.title} refs={panel.entities} entities={entities} />;
+    }
+    if (panel.type === 'adsb') {
+      return (
+        <AdsbPanel
+          key={panel.id}
+          title={panel.title}
+          baseHost={panel.baseHost}
+          refreshSeconds={panel.refreshSeconds ?? 8}
+        />
+      );
     }
     if (panel.chart === 'disk') {
       return (
