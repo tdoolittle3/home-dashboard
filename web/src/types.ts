@@ -65,7 +65,15 @@ export type Panel =
   | { id: string; title: string; type: 'cameras'; cameras: CameraRef[]; refreshSeconds?: number }
   | { id: string; title: string; type: 'service'; service: ServiceName }
   | { id: string; title: string; type: 'system'; metrics: SystemMetricRef[] }
-  | { id: string; title: string; type: 'ups'; entities: UpsEntityRefs };
+  | { id: string; title: string; type: 'ups'; entities: UpsEntityRefs }
+  | {
+      id: string;
+      title: string;
+      type: 'adsb';
+      /** Host[:port] of tar1090, e.g. "ladybird:8080"; iframe, poll and full-map link all build on it. */
+      baseHost: string;
+      refreshSeconds?: number;
+    };
 
 /** One point of recorded numeric history, from /api/history/:entityId. */
 export interface HistoryPoint {

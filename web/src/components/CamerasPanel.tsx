@@ -21,6 +21,7 @@ interface CamerasPanelProps {
 export function CamerasPanel({ title, cameras, refreshSeconds, stillHeight = 360 }: CamerasPanelProps) {
   const [tick, setTick] = useState(() => Date.now());
   const [viewing, setViewing] = useState<number | null>(null);
+  const viewingCamera = viewing === null ? undefined : cameras[viewing];
 
   useEffect(() => {
     const interval = setInterval(() => setTick(Date.now()), Math.max(refreshSeconds, 1) * 1000);
@@ -62,7 +63,7 @@ export function CamerasPanel({ title, cameras, refreshSeconds, stillHeight = 360
         ))}
       </div>
 
-      {viewing !== null ? <CameraViewer camera={cameras[viewing]} onClose={() => setViewing(null)} /> : null}
+      {viewingCamera ? <CameraViewer camera={viewingCamera} onClose={() => setViewing(null)} /> : null}
     </Panel>
   );
 }

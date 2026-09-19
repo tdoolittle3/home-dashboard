@@ -67,7 +67,21 @@ export type Panel =
       /** Host uptime and hardware readings, drawn as stat tiles rather than rows. */
       metrics: SystemMetricRef[];
     }
-  | { id: string; title: string; type: 'ups'; entities: UpsEntityRefs };
+  | { id: string; title: string; type: 'ups'; entities: UpsEntityRefs }
+  | {
+      id: string;
+      title: string;
+      type: 'adsb';
+      /**
+       * Host[:port] of the tar1090 instance, e.g. "ladybird:8080". The browser
+       * talks to it directly (iframe, aircraft.json poll, full-map link), so it
+       * must resolve from wherever the dashboard is open - the Tailscale
+       * MagicDNS name, never a LAN IP.
+       */
+      baseHost: string;
+      /** How often the aircraft table refreshes. Default 8. */
+      refreshSeconds?: number;
+    };
 
 /** Polled services that get a panel of their own. Each needs its `*_BASE_URL` and key in .env. */
 export const SERVICE_NAMES = ['uptimeKuma', 'jellyfin', 'immich'] as const;
@@ -123,6 +137,8 @@ function stripTrailingSlash(url: string): string {
 
 const ENTITY_ID = /^[a-z_]+\.[a-z0-9_]+$/;
 const METRIC_KINDS = new Set<string>(['uptime', 'percent', 'value']);
+/** A bare hostname or host:port; the frontend builds http:// URLs on it verbatim. */
+const HOST_PORT = /^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?(?::\d{1,5})?$/i;
 
 function loadDashboard(path: string): DashboardConfig {
   const raw = readFileSync(resolve(path), 'utf8');
@@ -191,6 +207,16 @@ function loadDashboard(path: string): DashboardConfig {
           throw new Error(`${path}: panel "${panel.id}" has a missing or invalid "${role}" entity_id`);
         }
       }
+    } else if (panel.type === 'adsb') {
+      if (!HOST_PORT.test(panel.baseHost ?? '')) {
+        throw new Error(`${path}: panel "${panel.id}" needs a "baseHost" like "ladybird:8080"`);
+      }
+      if (
+        panel.refreshSeconds !== undefined &&
+        (typeof panel.refreshSeconds !== 'number' || !Number.isFinite(panel.refreshSeconds) || panel.refreshSeconds <= 0)
+      ) {
+        throw new Error(`${path}: panel "${panel.id}" has a non-positive "refreshSeconds"`);
+      }
     } else if (panel.type === 'service') {
       if (!(SERVICE_NAMES as readonly string[]).includes(panel.service)) {
         throw new Error(
@@ -239,7 +265,8 @@ export function loadConfig(): AppConfig {
         for (const camera of panel.cameras) cameras.add(camera.name);
         break;
       case 'service':
-        // Service panels read their own APIs, not HA entities.
+      case 'adsb':
+        // These panels read their own APIs, not HA entities.
         break;
     }
   }

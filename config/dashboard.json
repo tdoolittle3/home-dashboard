@@ -8,6 +8,7 @@
     "A 'service' panel shows one polled service in depth: \"service\" is uptimeKuma, jellyfin or immich. It needs that service's *_BASE_URL and *_API_KEY in .env, and says so when they are missing.",
     "A 'system' panel draws host readings as tiles. 'kind' is uptime | percent | value (inferred when omitted); 'warn' and 'crit' are thresholds the reading is compared against.",
     "A 'ups' panel draws the rack UPS as a battery gauge. Its 'entities' object maps the five roles (charge, runtime, load, voltage, problem) to the ladybird_ups MQTT discovery entities; the problem sensor's attributes drive the ok/warning/critical look.",
+    "An 'adsb' panel embeds the tar1090 map and polls its aircraft.json. 'baseHost' is the one place the receiver's host:port lives - the iframe, the poll and the full-map link all build on it. The browser talks to it directly, so use a name that resolves over Tailscale (ladybird or ladybird.<tailnet>.ts.net), never a LAN IP.",
     "The sensor.system_monitor_* ids need HA's System Monitor integration (Settings -> Devices & services -> Add -> System Monitor). Ids not in HA show as 'not in HA' rather than hiding.",
     "Find entity ids in Home Assistant under Developer tools -> States."
   ],
@@ -62,6 +63,13 @@
         "voltage": "sensor.ladybird_ups_input_voltage",
         "problem": "binary_sensor.ladybird_ups_power_problem"
       }
+    },
+    {
+      "id": "flights",
+      "title": "Flight Tracking",
+      "type": "adsb",
+      "baseHost": "ladybird:8080",
+      "refreshSeconds": 8
     },
     {
       "id": "uptime",
