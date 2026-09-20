@@ -33,7 +33,7 @@ export interface CameraRef {
 }
 
 /** Polled services that get a panel of their own. Mirrors SERVICE_NAMES in server/src/config.ts. */
-export type ServiceName = 'uptimeKuma' | 'jellyfin' | 'immich';
+export type ServiceName = 'uptimeKuma' | 'jellyfin' | 'immich' | 'adguard';
 
 export type SystemMetricKind = 'uptime' | 'percent' | 'value';
 
@@ -214,6 +214,37 @@ export interface ImmichSummary {
   } | null;
 }
 
+export interface AdguardTopEntry {
+  name: string;
+  count: number;
+}
+
+export interface AdguardQuery {
+  domain: string;
+  client: string | null;
+  blocked: boolean;
+  reason: string | null;
+  time: string | null;
+}
+
+export interface AdguardSummary {
+  running: boolean;
+  protectionEnabled: boolean;
+  version: string | null;
+  /** Today's totals; zero before the router cutover, which is expected, not broken. */
+  queries: number;
+  blocked: number;
+  /** null when there are no queries yet, so the UI never divides by zero. */
+  blockedPercent: number | null;
+  avgProcessingMs: number | null;
+  topBlocked: AdguardTopEntry[];
+  topClients: AdguardTopEntry[];
+  recentQueries: AdguardQuery[];
+  /** True when AdGuard stopped answering and this is its last good data. */
+  stale: boolean;
+  lastError: string | null;
+}
+
 export interface LinkHealth {
   label: string;
   up: boolean;
@@ -227,6 +258,7 @@ export interface SourcesSnapshot {
   jellyfin: SourceResult<JellyfinSummary> | null;
   uptimeKuma: SourceResult<KumaSummary> | null;
   immich: SourceResult<ImmichSummary> | null;
+  adguard: SourceResult<AdguardSummary> | null;
   /** Liveness pings for the generic link tiles; null when no link has a health url. */
   linkHealth: SourceResult<LinkHealth[]> | null;
 }

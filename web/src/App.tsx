@@ -1,6 +1,7 @@
 import { AdsbPanel } from './components/AdsbPanel';
 import { CamerasPanel } from './components/CamerasPanel';
 import { ControlsPanel } from './components/ControlsPanel';
+import { DnsPanel } from './components/DnsPanel';
 import { EntitiesPanel } from './components/EntitiesPanel';
 import { MediaPanel } from './components/MediaPanel';
 import { PhotosPanel } from './components/PhotosPanel';
@@ -76,6 +77,8 @@ export function App() {
           return <MediaPanel key={panel.id} title={panel.title} result={sources.jellyfin} />;
         case 'immich':
           return <PhotosPanel key={panel.id} title={panel.title} result={sources.immich} />;
+        case 'adguard':
+          return <DnsPanel key={panel.id} title={panel.title} result={sources.adguard} kuma={sources.uptimeKuma} />;
       }
     }
     if (panel.type === 'system') {
