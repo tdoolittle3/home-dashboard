@@ -101,6 +101,7 @@ breaking the page. The other keys:
 | Jellyfin | Dashboard → API Keys → **+** | sent as `X-Emby-Token` |
 | Uptime Kuma | Settings → API Keys → **Add** | used as the HTTP basic password on `/metrics`; Kuma ignores the username |
 | Immich | Account settings → API Keys → **New**, signed in as the **admin** | sent as `x-api-key`. Library totals and the job queue are admin-only; a non-admin key gets version and disk figures only |
+| AdGuard Home | the admin UI login (`ADGUARD_USERNAME` / `ADGUARD_PASSWORD`) | HTTP basic auth on every `/control/*` endpoint; the dashboard only reads status, stats and the query log |
 
 ```bash
 npm run dev
@@ -124,8 +125,9 @@ is mounted read-only in the container.
 
 `controls` panels double as the write allowlist, so there is no second list to drift out of sync.
 
-`service` panels show one polled service in depth; `"service"` is `uptimeKuma`, `jellyfin` or
-`immich`. Each needs its `*_BASE_URL` and `*_API_KEY` in `.env`, and the panel names them when they
+`service` panels show one polled service in depth; `"service"` is `uptimeKuma`, `jellyfin`,
+`immich` or `adguard`. Each needs its `*_BASE_URL` and credentials (`*_API_KEY`, or
+`ADGUARD_USERNAME`/`ADGUARD_PASSWORD`) in `.env`, and the panel names them when they
 are missing rather than rendering empty:
 
 - **Uptime Kuma** — every monitor with its state, latency while up, what it watches, and days left
@@ -135,6 +137,14 @@ are missing rather than rendering empty:
   Sessions idle for more than fifteen minutes are stale clients and are not counted as viewers.
 - **Immich** — photo and video totals, library size, the photo disk as a fill bar, usage per user,
   and the job queues (thumbnails, machine learning, transcodes) that are busy, failing, or paused.
+- **AdGuard Home** — today's query count, blocked percentage and average lookup time, the top
+  blocked domains and top clients as bars, and the last twenty queries with blocked ones marked.
+  The header carries the protection on/off state and the two Uptime Kuma monitors (named exactly
+  `DNS resolver` and `AdGuard UI` in Kuma) watching the resolver from outside. Read-only by design —
+  no protection toggle. The server paces itself (stats every 30 s, query log every 10 s, backing off
+  when AdGuard misses a poll and holding the last good data) so the dashboard never leans on the
+  resolver the house depends on. Zero queries before the router cutover is an expected state the
+  panel says out loud, not an error.
 
 The compact **Services** strip in the side column keeps one tile per service regardless, so the
 detail panels can be dropped from the config without losing the up/down view.

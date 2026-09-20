@@ -83,8 +83,8 @@ export type Panel =
       refreshSeconds?: number;
     };
 
-/** Polled services that get a panel of their own. Each needs its `*_BASE_URL` and key in .env. */
-export const SERVICE_NAMES = ['uptimeKuma', 'jellyfin', 'immich'] as const;
+/** Polled services that get a panel of their own. Each needs its `*_BASE_URL` and credentials in .env. */
+export const SERVICE_NAMES = ['uptimeKuma', 'jellyfin', 'immich', 'adguard'] as const;
 export type ServiceName = (typeof SERVICE_NAMES)[number];
 
 /** The built-in Services tiles a link can attach its URL to. */
@@ -120,6 +120,7 @@ export interface AppConfig {
   jellyfin: { baseUrl: string; apiKey: string } | null;
   uptimeKuma: { baseUrl: string; apiKey: string } | null;
   immich: { baseUrl: string; apiKey: string } | null;
+  adguard: { baseUrl: string; username: string; password: string } | null;
   sourceTtlMs: number;
   sourcePushMs: number;
   dashboard: DashboardConfig;
@@ -316,6 +317,9 @@ export function loadConfig(): AppConfig {
   const immichBase = optional('IMMICH_BASE_URL');
   const immichKey = optional('IMMICH_API_KEY');
   const frigateBase = optional('FRIGATE_BASE_URL');
+  const adguardBase = optional('ADGUARD_BASE_URL');
+  const adguardUser = optional('ADGUARD_USERNAME');
+  const adguardPass = optional('ADGUARD_PASSWORD');
 
   return {
     port: num('PORT', 8099),
@@ -325,6 +329,10 @@ export function loadConfig(): AppConfig {
     jellyfin: jellyfinBase && jellyfinKey ? { baseUrl: stripTrailingSlash(jellyfinBase), apiKey: jellyfinKey } : null,
     uptimeKuma: kumaBase && kumaKey ? { baseUrl: stripTrailingSlash(kumaBase), apiKey: kumaKey } : null,
     immich: immichBase && immichKey ? { baseUrl: stripTrailingSlash(immichBase), apiKey: immichKey } : null,
+    adguard:
+      adguardBase && adguardUser && adguardPass
+        ? { baseUrl: stripTrailingSlash(adguardBase), username: adguardUser, password: adguardPass }
+        : null,
     sourceTtlMs: num('SOURCE_TTL_SECONDS', 10) * 1000,
     sourcePushMs: num('SOURCE_PUSH_SECONDS', 15) * 1000,
     dashboard,

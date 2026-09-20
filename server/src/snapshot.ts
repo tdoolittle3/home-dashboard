@@ -1,5 +1,6 @@
 import type { AppConfig, DashboardConfig } from './config.js';
 import type { HaClient, HaStatus, HassState } from './ha/client.js';
+import { createAdguardSource, type AdguardSummary } from './sources/adguard.js';
 import { createFrigateSource, type FrigateSummary } from './sources/frigate.js';
 import { cached, toResult, type SourceResult } from './sources/http.js';
 import { createImmichSource, type ImmichSummary } from './sources/immich.js';
@@ -29,6 +30,7 @@ export interface SourcesSnapshot {
   jellyfin: SourceResult<JellyfinSummary> | null;
   uptimeKuma: SourceResult<KumaSummary> | null;
   immich: SourceResult<ImmichSummary> | null;
+  adguard: SourceResult<AdguardSummary> | null;
   /** Liveness pings for the generic link tiles; null when no link has a health url. */
   linkHealth: SourceResult<LinkHealth[]> | null;
 }
@@ -85,6 +87,7 @@ export class SnapshotBuilder {
   #jellyfin: (() => Promise<SourceResult<JellyfinSummary>>) | null;
   #uptimeKuma: (() => Promise<SourceResult<KumaSummary>>) | null;
   #immich: (() => Promise<SourceResult<ImmichSummary>>) | null;
+  #adguard: (() => Promise<SourceResult<AdguardSummary>>) | null;
   #linkHealth: (() => Promise<SourceResult<LinkHealth[]>>) | null;
 
   constructor(config: AppConfig, ha: HaClient) {
@@ -92,17 +95,21 @@ export class SnapshotBuilder {
     this.#ha = ha;
 
     const ttl = config.sourceTtlMs;
-    const { frigate, jellyfin, uptimeKuma, immich } = config;
+    const { frigate, jellyfin, uptimeKuma, immich, adguard } = config;
 
     const frigateSource = frigate ? createFrigateSource(frigate.baseUrl) : null;
     const jellyfinSource = jellyfin ? createJellyfinSource(jellyfin.baseUrl, jellyfin.apiKey) : null;
     const kumaSource = uptimeKuma ? createUptimeKumaSource(uptimeKuma.baseUrl, uptimeKuma.apiKey) : null;
     const immichSource = immich ? createImmichSource(immich.baseUrl, immich.apiKey) : null;
+    // The adguard source paces itself per endpoint (stats 30s, query log 10s,
+    // backoff on errors); this outer cache only coalesces concurrent builds.
+    const adguardSource = adguard ? createAdguardSource(adguard.baseUrl, adguard.username, adguard.password) : null;
 
     this.#frigate = frigateSource ? cached(ttl, () => toResult('frigate', frigateSource)) : null;
     this.#jellyfin = jellyfinSource ? cached(ttl, () => toResult('jellyfin', jellyfinSource)) : null;
     this.#uptimeKuma = kumaSource ? cached(ttl, () => toResult('uptime-kuma', kumaSource)) : null;
     this.#immich = immichSource ? cached(ttl, () => toResult('immich', immichSource)) : null;
+    this.#adguard = adguardSource ? cached(ttl, () => toResult('adguard', adguardSource)) : null;
 
     const healthLinks = config.dashboard.links.filter((link) => link.health !== undefined);
     const linkHealthSource = healthLinks.length > 0 ? createLinkHealthSource(healthLinks) : null;
@@ -118,14 +125,15 @@ export class SnapshotBuilder {
   }
 
   async sources(): Promise<SourcesSnapshot> {
-    const [frigate, jellyfin, uptimeKuma, immich, linkHealth] = await Promise.all([
+    const [frigate, jellyfin, uptimeKuma, immich, adguard, linkHealth] = await Promise.all([
       this.#frigate ? this.#frigate() : Promise.resolve(null),
       this.#jellyfin ? this.#jellyfin() : Promise.resolve(null),
       this.#uptimeKuma ? this.#uptimeKuma() : Promise.resolve(null),
       this.#immich ? this.#immich() : Promise.resolve(null),
+      this.#adguard ? this.#adguard() : Promise.resolve(null),
       this.#linkHealth ? this.#linkHealth() : Promise.resolve(null),
     ]);
-    return { frigate, jellyfin, uptimeKuma, immich, linkHealth };
+    return { frigate, jellyfin, uptimeKuma, immich, adguard, linkHealth };
   }
 
   async build(): Promise<Snapshot> {
