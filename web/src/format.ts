@@ -74,7 +74,18 @@ export function formatRelative(iso: string | null): string {
   return `${Math.round(seconds / 86_400)}d ago`;
 }
 
-export function formatEpoch(seconds: number | null): string {
+/** Clock time for event lists: same-day events show just hour and minute; older ones gain the date. */
+export function formatEventTime(seconds: number | null): string {
   if (seconds === null) return '';
-  return formatRelative(new Date(seconds * 1000).toISOString());
+  const then = new Date(seconds * 1000);
+  if (!Number.isFinite(then.getTime())) return '';
+
+  const time = then.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  const now = new Date();
+  const sameDay =
+    then.getFullYear() === now.getFullYear() &&
+    then.getMonth() === now.getMonth() &&
+    then.getDate() === now.getDate();
+  if (sameDay) return time;
+  return `${then.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} ${time}`;
 }

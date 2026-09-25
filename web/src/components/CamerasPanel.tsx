@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import type { CameraRef } from '../types';
+import { formatEventTime } from '../format';
+import type { CameraRef, FrigateSummary, SourceResult } from '../types';
 import { CameraViewer } from './CameraViewer';
 import { Panel } from './Panel';
 
@@ -10,6 +11,8 @@ interface CamerasPanelProps {
   /** Height to request from the proxy. The hero row renders large enough that
       the old 360px default looked soft on a wide screen. */
   stillHeight?: number;
+  /** Recent detections render under the stills they came from, not in Services. */
+  frigate?: SourceResult<FrigateSummary> | null;
 }
 
 /**
@@ -18,7 +21,7 @@ interface CamerasPanelProps {
  * Frigate encodes MJPEG per connected viewer. The live stream runs only in the
  * full-screen viewer, where someone has deliberately opened one camera.
  */
-export function CamerasPanel({ title, cameras, refreshSeconds, stillHeight = 360 }: CamerasPanelProps) {
+export function CamerasPanel({ title, cameras, refreshSeconds, stillHeight = 360, frigate }: CamerasPanelProps) {
   const [tick, setTick] = useState(() => Date.now());
   const [viewing, setViewing] = useState<number | null>(null);
   const viewingCamera = viewing === null ? undefined : cameras[viewing];
@@ -62,6 +65,25 @@ export function CamerasPanel({ title, cameras, refreshSeconds, stillHeight = 360
           </figure>
         ))}
       </div>
+
+      {frigate?.ok && frigate.data.recentEvents.length > 0 ? (
+        <>
+          <h3 className="subhead">Recent detections</h3>
+          <ul className="rows rows--tight">
+            {frigate.data.recentEvents.slice(0, 5).map((event) => (
+              <li key={event.id} className="row">
+                <span className="row__label">
+                  {event.label} · {event.camera}
+                </span>
+                <span className="row__value">
+                  {event.score === null ? '' : `${Math.round(event.score * 100)}%`}
+                </span>
+                <span className="row__meta">{formatEventTime(event.startTime)}</span>
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : null}
 
       {viewingCamera ? <CameraViewer camera={viewingCamera} onClose={() => setViewing(null)} /> : null}
     </Panel>

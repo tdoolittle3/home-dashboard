@@ -62,6 +62,7 @@ export function App() {
           cameras={panel.cameras}
           refreshSeconds={panel.refreshSeconds ?? 5}
           stillHeight={540}
+          frigate={sources.frigate}
         />
       );
     }
