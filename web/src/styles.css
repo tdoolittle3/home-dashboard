@@ -1560,6 +1560,16 @@ body {
   .row--control .row__meta {
     display: block;
   }
+
+  /* Detection rows exist to say when something happened, so their timestamp
+     survives the small-screen declutter. */
+  .rows--stamped .row {
+    grid-template-columns: 1fr auto auto;
+  }
+
+  .rows--stamped .row__meta {
+    display: block;
+  }
 }
 
 /* --- system panel: uptime headline over a grid of hardware readings --- */
