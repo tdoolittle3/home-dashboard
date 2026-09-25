@@ -69,7 +69,7 @@ export function CamerasPanel({ title, cameras, refreshSeconds, stillHeight = 360
       {frigate?.ok && frigate.data.recentEvents.length > 0 ? (
         <>
           <h3 className="subhead">Recent detections</h3>
-          <ul className="rows rows--tight">
+          <ul className="rows rows--tight rows--stamped">
             {frigate.data.recentEvents.slice(0, 5).map((event) => (
               <li key={event.id} className="row">
                 <span className="row__label">
