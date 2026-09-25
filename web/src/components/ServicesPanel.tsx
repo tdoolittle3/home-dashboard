@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { formatBytes, formatEpoch, formatNumber, formatUptime } from '../format';
+import { formatBytes, formatNumber, formatUptime } from '../format';
 import type { HaStatus, LinkHealth, ServiceLink, SourcesSnapshot, TileService } from '../types';
 import { Panel } from './Panel';
 
@@ -153,25 +153,6 @@ export function ServicesPanel({ ha, sources, links }: ServicesPanelProps) {
           );
         })}
       </div>
-
-      {frigate?.ok && frigate.data.recentEvents.length > 0 ? (
-        <>
-          <h3 className="subhead">Recent detections</h3>
-          <ul className="rows rows--tight">
-            {frigate.data.recentEvents.slice(0, 5).map((event) => (
-              <li key={event.id} className="row">
-                <span className="row__label">
-                  {event.label} · {event.camera}
-                </span>
-                <span className="row__value">
-                  {event.score === null ? '' : `${Math.round(event.score * 100)}%`}
-                </span>
-                <span className="row__meta">{formatEpoch(event.startTime)}</span>
-              </li>
-            ))}
-          </ul>
-        </>
-      ) : null}
 
     </Panel>
   );
