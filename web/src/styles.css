@@ -85,7 +85,8 @@ body {
 }
 
 .shell {
-  max-width: 1280px;
+  /* Wide enough for three ~600px columns on a 1080p monitor. */
+  max-width: 1880px;
   margin: 0 auto;
   /* Run standalone from a phone's home screen, the page draws under the
      status bar and home indicator; the safe-area maxima keep clear of both. */
@@ -217,6 +218,23 @@ body {
   grid-area: side;
   display: grid;
   gap: var(--gap);
+  min-width: 0;
+}
+
+/* Desktop: panels dealt into balanced columns (components/Masonry.tsx). */
+.masonry {
+  display: grid;
+  gap: var(--gap);
+  align-items: start;
+}
+
+.masonry__col {
+  display: grid;
+  gap: var(--gap);
+  min-width: 0;
+}
+
+.masonry__item {
   min-width: 0;
 }
 
