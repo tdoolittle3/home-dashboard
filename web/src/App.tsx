@@ -3,6 +3,7 @@ import { CamerasPanel } from './components/CamerasPanel';
 import { ControlsPanel } from './components/ControlsPanel';
 import { DnsPanel } from './components/DnsPanel';
 import { EntitiesPanel } from './components/EntitiesPanel';
+import { Masonry } from './components/Masonry';
 import { MediaPanel } from './components/MediaPanel';
 import { PhotosPanel } from './components/PhotosPanel';
 import { ServicesPanel } from './components/ServicesPanel';
@@ -13,6 +14,7 @@ import { UptimePanel } from './components/UptimePanel';
 import { formatRelative } from './format';
 import type { Panel } from './types';
 import { useDashboard } from './useDashboard';
+import { useMediaQuery } from './useMediaQuery';
 
 const STREAM_LABEL: Record<string, string> = {
   connecting: 'connecting',
@@ -22,6 +24,10 @@ const STREAM_LABEL: Record<string, string> = {
 
 export function App() {
   const { snapshot, stream, error, reload } = useDashboard();
+  // Desktop widths deal the panels into balanced columns; below 901px the
+  // single stacked column the phone layout was built around stays as it is.
+  const desktop = useMediaQuery('(min-width: 901px)');
+  const wide = useMediaQuery('(min-width: 1500px)');
 
   if (!snapshot) {
     return (
@@ -44,12 +50,11 @@ export function App() {
 
   const { dashboard, entities, sources, ha } = snapshot;
 
-  // Cameras lead the page in a full-width row of their own. Below it the page
-  // splits into a wide main column (system, storage and any other entity panels) and a
-  // narrower side stack (controls, then services), each in the order
-  // config/dashboard.json lists them. The side stack comes first in the DOM so
-  // that on a phone, where the columns collapse, the switches sit right under
-  // the cameras instead of below the charts.
+  // Cameras lead the page in a full-width row of their own. Below it, on a
+  // phone, the side stack (controls, then services) comes first so the switches
+  // sit right under the cameras, then every other panel in the order
+  // config/dashboard.json lists them. On a desktop the side stack heads the
+  // last column and the rest are dealt into balanced columns in that order.
   const cameraPanels = dashboard.panels.filter((panel) => panel.type === 'cameras');
   const sidePanels = dashboard.panels.filter((panel) => panel.type === 'controls');
   const mainPanels = dashboard.panels.filter((panel) => panel.type !== 'cameras' && panel.type !== 'controls');
@@ -129,13 +134,26 @@ export function App() {
 
       {cameraPanels.length > 0 ? <div className="hero">{cameraPanels.map(renderPanel)}</div> : null}
 
-      <div className={mainPanels.length > 0 ? 'layout' : 'layout layout--single'}>
-        <div className="layout__side">
-          {sidePanels.map(renderPanel)}
-          <ServicesPanel ha={ha} sources={sources} links={dashboard.links} />
+      {desktop ? (
+        <Masonry
+          columns={wide ? 3 : 2}
+          pinned={
+            <div className="layout__side">
+              {sidePanels.map(renderPanel)}
+              <ServicesPanel ha={ha} sources={sources} links={dashboard.links} />
+            </div>
+          }
+          items={mainPanels.map((panel) => ({ key: panel.id, node: renderPanel(panel) }))}
+        />
+      ) : (
+        <div className={mainPanels.length > 0 ? 'layout' : 'layout layout--single'}>
+          <div className="layout__side">
+            {sidePanels.map(renderPanel)}
+            <ServicesPanel ha={ha} sources={sources} links={dashboard.links} />
+          </div>
+          {mainPanels.length > 0 ? <div className="layout__main">{mainPanels.map(renderPanel)}</div> : null}
         </div>
-        {mainPanels.length > 0 ? <div className="layout__main">{mainPanels.map(renderPanel)}</div> : null}
-      </div>
+      )}
     </main>
   );
 }
