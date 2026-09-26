@@ -110,6 +110,13 @@ interface Row {
  */
 export function AdsbPanel({ title, baseHost, refreshSeconds }: AdsbPanelProps) {
   const mapUrl = `http://${baseHost}/`;
+  // On a phone tar1090's top button row (U/H/T) lands on the selected-aircraft
+  // card's close box, so a tapped plane can never be dismissed. Pinch-zoom
+  // covers the lost +/-; the full-map link keeps every control. Read once:
+  // swapping src on rotate would reload the map.
+  const [frameUrl] = useState(() =>
+    window.matchMedia('(max-width: 560px)').matches ? `${mapUrl}?hideButtons` : mapUrl,
+  );
 
   const [aircraft, setAircraft] = useState<Aircraft[] | null>(null);
   const [offline, setOffline] = useState(false);
@@ -227,7 +234,7 @@ export function AdsbPanel({ title, baseHost, refreshSeconds }: AdsbPanelProps) {
       <div className="adsb">
         <iframe
           className="adsb__map"
-          src={mapUrl}
+          src={frameUrl}
           title="Live ADS-B map (tar1090)"
           loading="lazy"
           allowFullScreen
