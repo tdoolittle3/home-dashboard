@@ -5,6 +5,7 @@ import { createFrigateSource, type FrigateSummary } from './sources/frigate.js';
 import { cached, toResult, type SourceResult } from './sources/http.js';
 import { createImmichSource, type ImmichSummary } from './sources/immich.js';
 import { createJellyfinSource, type JellyfinSummary } from './sources/jellyfin.js';
+import type { MeshClient, MeshSummary } from './mesh/client.js';
 import { createLinkHealthSource, type LinkHealth } from './sources/linkHealth.js';
 import { createUptimeKumaSource, type KumaSummary } from './sources/uptimeKuma.js';
 
@@ -41,6 +42,12 @@ export interface Snapshot {
   ha: HaStatus;
   entities: Record<string, EntitySnapshot>;
   sources: SourcesSnapshot;
+  /**
+   * Not a polled SourceResult: mesh state lives in memory off a broker
+   * subscription and updates ride their own `mesh` stream event, so it sits
+   * beside `sources` rather than inside it. Null when MESH_MQTT_URL is unset.
+   */
+  mesh: MeshSummary | null;
 }
 
 function attr(state: HassState, key: string): string | null {
@@ -83,6 +90,7 @@ export function toEntitySnapshot(entityId: string, state: HassState | null): Ent
 export class SnapshotBuilder {
   #config: AppConfig;
   #ha: HaClient;
+  #mesh: MeshClient | null;
   #frigate: (() => Promise<SourceResult<FrigateSummary>>) | null;
   #jellyfin: (() => Promise<SourceResult<JellyfinSummary>>) | null;
   #uptimeKuma: (() => Promise<SourceResult<KumaSummary>>) | null;
@@ -90,9 +98,10 @@ export class SnapshotBuilder {
   #adguard: (() => Promise<SourceResult<AdguardSummary>>) | null;
   #linkHealth: (() => Promise<SourceResult<LinkHealth[]>>) | null;
 
-  constructor(config: AppConfig, ha: HaClient) {
+  constructor(config: AppConfig, ha: HaClient, mesh: MeshClient | null = null) {
     this.#config = config;
     this.#ha = ha;
+    this.#mesh = mesh;
 
     const ttl = config.sourceTtlMs;
     const { frigate, jellyfin, uptimeKuma, immich, adguard } = config;
@@ -143,6 +152,7 @@ export class SnapshotBuilder {
       ha: this.#ha.status,
       entities: this.entities(),
       sources: await this.sources(),
+      mesh: this.#mesh?.summary() ?? null,
     };
   }
 }

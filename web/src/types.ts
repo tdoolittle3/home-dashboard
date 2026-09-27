@@ -69,6 +69,13 @@ export type Panel =
   | {
       id: string;
       title: string;
+      type: 'mesh';
+      /** How many of the buffered messages the feed shows. Default 20, ceiling 50. */
+      maxMessages?: number;
+    }
+  | {
+      id: string;
+      title: string;
       type: 'adsb';
       /** Host[:port] of tar1090, e.g. "ladybird:8080"; iframe, poll and full-map link all build on it. */
       baseHost: string;
@@ -263,12 +270,61 @@ export interface SourcesSnapshot {
   linkHealth: SourceResult<LinkHealth[]> | null;
 }
 
+// Mirrors server/src/mesh/client.ts.
+
+export interface MeshMessage {
+  id: number;
+  /** Sender's decimal node number; 0 for dashboard-sent messages. */
+  from: number;
+  /** 4294967295 (broadcast) unless it was a DM. */
+  to: number;
+  channel: number;
+  /** Epoch seconds. */
+  timestamp: number;
+  text: string;
+  /** True for messages sent from this dashboard rather than heard over the mesh. */
+  viaDashboard: boolean;
+}
+
+export interface MeshNode {
+  num: number;
+  id: string | null;
+  longName: string | null;
+  shortName: string | null;
+  batteryLevel: number | null;
+  voltage: number | null;
+  snr: number | null;
+  rssi: number | null;
+  /** Epoch seconds of the newest packet seen from this node. */
+  lastHeard: number;
+}
+
+export interface MeshStatus {
+  /** The server's connection to the MQTT broker. */
+  connected: boolean;
+  /** The gateway node's retained stat topic; null until the first frame arrives. */
+  gatewayOnline: boolean | null;
+  lastError: string | null;
+}
+
+export interface MeshSummary {
+  status: MeshStatus;
+  channel: string;
+  canSend: boolean;
+  /** Oldest first. */
+  messages: MeshMessage[];
+  /** Newest heard first. */
+  nodes: MeshNode[];
+}
+
 export interface Snapshot {
   generatedAt: string;
   dashboard: DashboardConfig;
   ha: HaStatus;
   entities: Record<string, EntitySnapshot>;
   sources: SourcesSnapshot;
+  /** Null when the server has no MESH_MQTT_URL configured. */
+  mesh: MeshSummary | null;
 }
 
 export type ControlAction = 'turn_on' | 'turn_off' | 'toggle';

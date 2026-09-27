@@ -5,6 +5,7 @@ import fastifyStatic from '@fastify/static';
 import Fastify from 'fastify';
 import { loadConfig } from './config.js';
 import { HaClient } from './ha/client.js';
+import { MeshClient } from './mesh/client.js';
 import { registerApiRoutes } from './routes/api.js';
 import { registerStreamRoute } from './routes/stream.js';
 import { SnapshotBuilder } from './snapshot.js';
@@ -30,10 +31,17 @@ async function main(): Promise<void> {
     else app.log.warn({ err: extra }, message);
   });
 
-  const snapshots = new SnapshotBuilder(config, ha);
+  const mesh = config.mesh
+    ? new MeshClient(config.mesh, (message, extra) => {
+        if (extra === undefined) app.log.info(message);
+        else app.log.warn({ err: extra }, message);
+      })
+    : null;
 
-  registerApiRoutes(app, config, ha, snapshots);
-  registerStreamRoute(app, config, ha, snapshots);
+  const snapshots = new SnapshotBuilder(config, ha, mesh);
+
+  registerApiRoutes(app, config, ha, snapshots, mesh);
+  registerStreamRoute(app, config, ha, snapshots, mesh);
 
   const webDist = resolveWebDist();
   if (webDist) {
@@ -51,11 +59,13 @@ async function main(): Promise<void> {
   }
 
   ha.start();
+  mesh?.start();
   await app.listen({ port: config.port, host: config.host });
 
   const shutdown = (signal: string): void => {
     app.log.info(`${signal} received, shutting down`);
     ha.stop();
+    mesh?.stop();
     void app.close().then(() => process.exit(0));
   };
   process.on('SIGINT', () => shutdown('SIGINT'));

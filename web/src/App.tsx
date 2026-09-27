@@ -5,6 +5,7 @@ import { DnsPanel } from './components/DnsPanel';
 import { EntitiesPanel } from './components/EntitiesPanel';
 import { Masonry } from './components/Masonry';
 import { MediaPanel } from './components/MediaPanel';
+import { MeshPanel } from './components/MeshPanel';
 import { PhotosPanel } from './components/PhotosPanel';
 import { ServicesPanel } from './components/ServicesPanel';
 import { StoragePanel } from './components/StoragePanel';
@@ -48,7 +49,7 @@ export function App() {
     );
   }
 
-  const { dashboard, entities, sources, ha } = snapshot;
+  const { dashboard, entities, sources, ha, mesh } = snapshot;
 
   // Cameras lead the page in a full-width row of their own. Below it, on a
   // phone, the side stack (controls, then services) comes first so the switches
@@ -92,6 +93,9 @@ export function App() {
     }
     if (panel.type === 'ups') {
       return <UpsPanel key={panel.id} title={panel.title} refs={panel.entities} entities={entities} />;
+    }
+    if (panel.type === 'mesh') {
+      return <MeshPanel key={panel.id} title={panel.title} mesh={mesh} maxMessages={panel.maxMessages} />;
     }
     if (panel.type === 'adsb') {
       return (

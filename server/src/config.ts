@@ -71,6 +71,13 @@ export type Panel =
   | {
       id: string;
       title: string;
+      type: 'mesh';
+      /** How many of the buffered messages the feed shows. Default 20, ceiling 50 (the server buffer). */
+      maxMessages?: number;
+    }
+  | {
+      id: string;
+      title: string;
       type: 'adsb';
       /**
        * Host[:port] of the tar1090 instance, e.g. "ladybird:8080". The browser
@@ -121,6 +128,19 @@ export interface AppConfig {
   uptimeKuma: { baseUrl: string; apiKey: string } | null;
   immich: { baseUrl: string; apiKey: string } | null;
   adguard: { baseUrl: string; username: string; password: string } | null;
+  /**
+   * Meshtastic-over-MQTT. `channel` is the channel NAME (an uplink topic
+   * segment); `channelIndex` is the numeric index downlink sends go out on -
+   * the same channel described two ways, and they must stay in sync. Without
+   * `channelIndex` and `gatewayNode` the panel is read-only.
+   */
+  mesh: {
+    mqttUrl: string;
+    rootTopic: string;
+    channel: string;
+    channelIndex: number | null;
+    gatewayNode: number | null;
+  } | null;
   sourceTtlMs: number;
   sourcePushMs: number;
   dashboard: DashboardConfig;
@@ -153,6 +173,40 @@ function num(name: string, fallback: number): number {
 
 function stripTrailingSlash(url: string): string {
   return url.replace(/\/+$/, '');
+}
+
+/** The channel name is a topic path segment, so keep it boring like camera names. */
+const MESH_CHANNEL_NAME = /^[A-Za-z0-9_-]+$/;
+
+function loadMesh(): AppConfig['mesh'] {
+  const mqttUrl = optional('MESH_MQTT_URL');
+  if (!mqttUrl) return null;
+  if (!/^mqtts?:\/\//.test(mqttUrl)) {
+    throw new Error('MESH_MQTT_URL must start with mqtt:// or mqtts://');
+  }
+
+  const channel = optional('MESH_CHANNEL');
+  if (!channel || !MESH_CHANNEL_NAME.test(channel)) {
+    throw new Error('MESH_MQTT_URL is set, so MESH_CHANNEL must be the channel name ([A-Za-z0-9_-]+)');
+  }
+
+  const intOrNull = (name: string, min: number): number | null => {
+    const raw = optional(name);
+    if (raw === null) return null;
+    const parsed = Number(raw);
+    if (!Number.isInteger(parsed) || parsed < min) {
+      throw new Error(`${name} must be an integer >= ${min}`);
+    }
+    return parsed;
+  };
+
+  return {
+    mqttUrl,
+    rootTopic: stripTrailingSlash(optional('MESH_ROOT_TOPIC') ?? 'msh/US'),
+    channel,
+    channelIndex: intOrNull('MESH_CHANNEL_INDEX', 0),
+    gatewayNode: intOrNull('MESH_GATEWAY_NODE', 1),
+  };
 }
 
 const ENTITY_ID = /^[a-z_]+\.[a-z0-9_]+$/;
@@ -227,6 +281,13 @@ function loadDashboard(path: string): DashboardConfig {
         if (!ENTITY_ID.test(panel.entities[role] ?? '')) {
           throw new Error(`${path}: panel "${panel.id}" has a missing or invalid "${role}" entity_id`);
         }
+      }
+    } else if (panel.type === 'mesh') {
+      if (
+        panel.maxMessages !== undefined &&
+        (!Number.isInteger(panel.maxMessages) || panel.maxMessages < 1 || panel.maxMessages > 50)
+      ) {
+        throw new Error(`${path}: panel "${panel.id}" needs "maxMessages" between 1 and 50`);
       }
     } else if (panel.type === 'adsb') {
       if (!HOST_PORT.test(panel.baseHost ?? '')) {
@@ -305,6 +366,7 @@ export function loadConfig(): AppConfig {
         break;
       case 'service':
       case 'adsb':
+      case 'mesh':
         // These panels read their own APIs, not HA entities.
         break;
     }
@@ -333,6 +395,7 @@ export function loadConfig(): AppConfig {
       adguardBase && adguardUser && adguardPass
         ? { baseUrl: stripTrailingSlash(adguardBase), username: adguardUser, password: adguardPass }
         : null,
+    mesh: loadMesh(),
     sourceTtlMs: num('SOURCE_TTL_SECONDS', 10) * 1000,
     sourcePushMs: num('SOURCE_PUSH_SECONDS', 15) * 1000,
     dashboard,

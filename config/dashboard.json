@@ -12,6 +12,7 @@
     "An 'adsb' panel embeds the tar1090 map and polls its aircraft.json. 'baseHost' is the one place the receiver's host:port lives - the iframe, the poll and the full-map link all build on it. The browser talks to it directly, so use a name that resolves over Tailscale (ladybird or ladybird.<tailnet>.ts.net), never a LAN IP.",
     "The sensor.system_monitor_* ids need HA's System Monitor integration (Settings -> Devices & services -> Add -> System Monitor). Ids not in HA show as 'not in HA' rather than hiding.",
     "The 'links' URLs use the Tailscale MagicDNS name ladybird.tail0e6756.ts.net so they open from any tailnet device, not just the LAN. Frigate points at its unauthenticated port 5000 rather than 8971, which would ask for a login.",
+    "A 'mesh' panel shows the Meshtastic private channel: message feed, send box and node roster. It needs MESH_MQTT_URL and MESH_CHANNEL in .env; the panel's presence is also the allowlist for /api/mesh/send, and sending additionally needs MESH_GATEWAY_NODE and MESH_CHANNEL_INDEX. 'maxMessages' (default 20, max 50) is how much of the feed shows.",
     "Find entity ids in Home Assistant under Developer tools -> States.",
     "'links' are the Services panel tiles (the topbar carries no links). An entry with 'service' (ha, frigate, jellyfin, uptimeKuma, immich) puts its url on that built-in tile, which already has live status. An entry without 'service' is a generic link tile; give it 'health' - a url the SERVER can reach (LAN IP, since it pings from inside the container) - and the tile gets a live up/down dot. 'url' stays browser-facing (the ts.net FQDN)."
   ],
@@ -73,6 +74,11 @@
       "type": "adsb",
       "baseHost": "ladybird:8080",
       "refreshSeconds": 8
+    },
+    {
+      "id": "mesh",
+      "title": "Mesh",
+      "type": "mesh"
     },
     {
       "id": "dns",
