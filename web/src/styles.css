@@ -1020,6 +1020,20 @@ body {
   outline: none;
 }
 
+/* iOS 26/27 undercount the home-screen app's layout viewport by the top
+   safe-area inset, so a fixed overlay's bottom: 0 stops a status-bar-sized
+   band short of the screen edge with the dashboard showing through. Only the
+   large viewport unit still spans the whole screen there, so run standalone
+   the viewer takes its height from that instead of its bottom edge. */
+@supports (height: 100lvh) {
+  @media (display-mode: standalone) {
+    .viewer {
+      bottom: auto;
+      height: 100lvh;
+    }
+  }
+}
+
 .viewer__frame {
   position: absolute;
   inset: 0;
