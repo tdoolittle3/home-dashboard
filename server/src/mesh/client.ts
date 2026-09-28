@@ -105,6 +105,13 @@ export class MeshClient {
   #status: MeshStatus = { connected: false, gatewayOnline: null, lastError: null };
   /** Dashboard-sent messages need ids too; the envelope ids are positive, so count down. */
   #syntheticId = -1;
+  /**
+   * Packet ids already shown. A one-node mesh hears no rebroadcast, so the
+   * radio retries every broadcast up to 3 times and each retry is echoed to
+   * MQTT with the SAME packet id - without this, one message renders thrice.
+   */
+  #seenIds = new Set<number>();
+  #seenOrder: number[] = [];
 
   #jsonPrefix: string;
   #statPrefix: string;
@@ -228,6 +235,19 @@ export class MeshClient {
     if (envelope.type === 'text' && channelName === this.#config.channel) {
       const text = stringOrNull(envelope.payload?.['text']);
       if (text === null) return;
+      const packetId = numberOr(envelope.id, 0);
+      if (packetId !== 0) {
+        if (this.#seenIds.has(packetId)) {
+          this.#emit(); // the node table still got its lastHeard bump
+          return;
+        }
+        this.#seenIds.add(packetId);
+        this.#seenOrder.push(packetId);
+        if (this.#seenOrder.length > 200) {
+          const oldest = this.#seenOrder.shift();
+          if (oldest !== undefined) this.#seenIds.delete(oldest);
+        }
+      }
       // Firmware 2.7.26 echoes the gateway's OWN transmissions back onto the
       // JSON uplink (observed live; the docs say it never does). Sends from
       // here are already in the buffer as their local echo, so drop the
@@ -242,7 +262,7 @@ export class MeshClient {
         return;
       }
       this.#pushMessage({
-        id: numberOr(envelope.id, 0),
+        id: packetId,
         from: envelope.from,
         to: numberOr(envelope.to, 4_294_967_295),
         channel: numberOr(envelope.channel, 0),
