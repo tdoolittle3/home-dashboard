@@ -298,6 +298,74 @@ body {
   margin-top: 4px;
 }
 
+/* --- collapsible: the show-more fold under a panel's headline --- */
+
+/* The grid-rows trick animates to the content's own height; the inner
+   wrapper owns overflow so nothing peeks out mid-slide. */
+.collapsible__body {
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows var(--motion-base) var(--ease);
+}
+
+.collapsible--open .collapsible__body {
+  grid-template-rows: 1fr;
+}
+
+.collapsible__inner {
+  min-height: 0;
+  overflow: hidden;
+  /* Keep collapsed rows out of tab order and screen readers; the delay
+     holds them visible until the close animation lands. */
+  visibility: hidden;
+  transition: visibility 0s var(--motion-base);
+}
+
+.collapsible--open .collapsible__inner {
+  visibility: visible;
+  transition: visibility 0s;
+}
+
+/* Dressed like a subhead so the fold reads as another section divider,
+   just one you can press. */
+.collapsible__toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 4px 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--text-dim);
+  transition: color var(--motion-fast) var(--ease);
+}
+
+.collapsible__toggle:hover {
+  color: var(--text);
+}
+
+.collapsible__chevron {
+  width: 7px;
+  height: 7px;
+  margin-top: -3px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg);
+  transition: transform var(--motion-fast) var(--ease);
+  flex: none;
+}
+
+.collapsible--open .collapsible__chevron {
+  margin-top: 3px;
+  transform: rotate(225deg);
+}
+
 /* --- rows --- */
 
 .rows {
@@ -866,6 +934,51 @@ body {
   align-items: center;
   gap: 6px;
   white-space: nowrap;
+}
+
+/* The uptime panel's traffic light: one tone variable colours the whole
+   banner, same trick as the UPS moods. */
+.health {
+  display: grid;
+  gap: 2px;
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid color-mix(in srgb, var(--health-tone) 45%, var(--border));
+  background: color-mix(in srgb, var(--health-tone) 10%, transparent);
+}
+
+.health--ok {
+  --health-tone: var(--up);
+}
+
+.health--degraded {
+  --health-tone: var(--warn);
+}
+
+.health--outage {
+  --health-tone: var(--down);
+}
+
+.health--unknown {
+  --health-tone: var(--idle);
+}
+
+.health__title {
+  font-size: var(--fs-md);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--health-tone);
+}
+
+.health--outage .health__title {
+  text-transform: uppercase;
+  animation: ups-pulse 1.8s var(--ease) infinite;
+}
+
+.health__sub {
+  font-size: var(--fs-sm);
+  color: var(--text-dim);
+  overflow-wrap: anywhere;
 }
 
 /* A two-line label: the thing, then what it points at, in one cell. */
@@ -1520,6 +1633,7 @@ body {
   .tile__dot--up,
   .ups__banner--critical .ups__banner-title,
   .ups--critical .ups__gauge-fill,
+  .health--outage .health__title,
   .badge--emergency {
     animation: none;
   }
