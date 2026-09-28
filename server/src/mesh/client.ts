@@ -228,6 +228,19 @@ export class MeshClient {
     if (envelope.type === 'text' && channelName === this.#config.channel) {
       const text = stringOrNull(envelope.payload?.['text']);
       if (text === null) return;
+      // Firmware 2.7.26 echoes the gateway's OWN transmissions back onto the
+      // JSON uplink (observed live; the docs say it never does). Sends from
+      // here are already in the buffer as their local echo, so drop the
+      // radio's copy or every dashboard message shows twice.
+      if (
+        envelope.from === this.#config.gatewayNode &&
+        this.#messages.some(
+          (m) => m.viaDashboard && m.text === text && Math.abs(timestamp - m.timestamp) < 60,
+        )
+      ) {
+        this.#emit();
+        return;
+      }
       this.#pushMessage({
         id: numberOr(envelope.id, 0),
         from: envelope.from,
