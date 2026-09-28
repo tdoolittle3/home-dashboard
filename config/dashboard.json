@@ -13,6 +13,7 @@
     "The sensor.system_monitor_* ids need HA's System Monitor integration (Settings -> Devices & services -> Add -> System Monitor). Ids not in HA show as 'not in HA' rather than hiding.",
     "The 'links' URLs use the Tailscale MagicDNS name ladybird.tail0e6756.ts.net so they open from any tailnet device, not just the LAN. Frigate points at its unauthenticated port 5000 rather than 8971, which would ask for a login.",
     "A 'mesh' panel shows the Meshtastic private channel: message feed, send box and node roster. It needs MESH_MQTT_URL and MESH_CHANNEL in .env; the panel's presence is also the allowlist for /api/mesh/send, and sending additionally needs MESH_GATEWAY_NODE and MESH_CHANNEL_INDEX. 'maxMessages' (default 20, max 50) is how much of the feed shows.",
+    "The 'outdoor' panel entities come from the AcuRite Tower 433 MHz sensor via rtl_433 -> MQTT -> HA (home-automation repo, stacks/home configuration.yaml). A battery swap gives the sensor a NEW random id: repoint the MQTT topics there, not here - these HA entity ids are stable.",
     "Find entity ids in Home Assistant under Developer tools -> States.",
     "'links' are the Services panel tiles (the topbar carries no links). An entry with 'service' (ha, frigate, jellyfin, uptimeKuma, immich) puts its url on that built-in tile, which already has live status. An entry without 'service' is a generic link tile; give it 'health' - a url the SERVER can reach (LAN IP, since it pings from inside the container) - and the tile gets a live up/down dot. 'url' stays browser-facing (the ts.net FQDN)."
   ],
@@ -54,6 +55,16 @@
         { "entity_id": "sensor.ladybird_storage_disk_free", "name": "Disk free" },
         { "entity_id": "sensor.ladybird_storage_frigate_recordings", "name": "Frigate recordings" },
         { "entity_id": "sensor.ladybird_storage_media_library", "name": "Media library" }
+      ]
+    },
+    {
+      "id": "outdoor",
+      "title": "Outdoor",
+      "type": "entities",
+      "entities": [
+        { "entity_id": "sensor.outdoor_temperature", "name": "Temperature" },
+        { "entity_id": "sensor.outdoor_humidity", "name": "Humidity" },
+        { "entity_id": "binary_sensor.outdoor_sensor_battery_low", "name": "Sensor battery low" }
       ]
     },
     {
