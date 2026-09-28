@@ -57,7 +57,19 @@ export type Panel =
       /** Draw the largest filesystem Frigate reports above the rows. */
       chart?: 'disk';
     }
-  | { id: string; title: string; type: 'controls'; entities: EntityRef[] }
+  | {
+      id: string;
+      title: string;
+      type: 'controls';
+      entities: EntityRef[];
+      /**
+       * A strip of lamp buttons drawn in this order, left to right, matching
+       * where the lamps sit in the room. Writable, like `entities`.
+       */
+      lights?: { name?: string; entities: EntityRef[] };
+      /** Read-only status rows (doors, leak sensors): watched, never writable. */
+      sensors?: EntityRef[];
+    }
   | { id: string; title: string; type: 'cameras'; cameras: CameraRef[]; refreshSeconds?: number }
   | { id: string; title: string; type: 'service'; service: ServiceName }
   | {
@@ -240,6 +252,28 @@ function loadDashboard(path: string): DashboardConfig {
           `${path}: panel "${panel.id}" has unknown chart "${panel.chart}" - the only chart is "disk"`,
         );
       }
+      if (panel.type === 'controls') {
+        if (panel.lights !== undefined) {
+          if (!Array.isArray(panel.lights.entities) || panel.lights.entities.length === 0) {
+            throw new Error(`${path}: panel "${panel.id}" has a "lights" group without a non-empty "entities" array`);
+          }
+          for (const entity of panel.lights.entities) {
+            if (!ENTITY_ID.test(entity.entity_id ?? '')) {
+              throw new Error(`${path}: panel "${panel.id}" has an invalid lights entity_id: ${entity.entity_id}`);
+            }
+          }
+        }
+        if (panel.sensors !== undefined) {
+          if (!Array.isArray(panel.sensors) || panel.sensors.length === 0) {
+            throw new Error(`${path}: panel "${panel.id}" has a "sensors" array that is empty - drop it instead`);
+          }
+          for (const entity of panel.sensors) {
+            if (!ENTITY_ID.test(entity.entity_id ?? '')) {
+              throw new Error(`${path}: panel "${panel.id}" has an invalid sensor entity_id: ${entity.entity_id}`);
+            }
+          }
+        }
+      }
     } else if (panel.type === 'system') {
       if (!Array.isArray(panel.metrics) || panel.metrics.length === 0) {
         throw new Error(`${path}: panel "${panel.id}" needs a non-empty "metrics" array`);
@@ -350,10 +384,12 @@ export function loadConfig(): AppConfig {
         for (const entity of panel.entities) watched.add(entity.entity_id);
         break;
       case 'controls':
-        for (const entity of panel.entities) {
+        for (const entity of [...panel.entities, ...(panel.lights?.entities ?? [])]) {
           watched.add(entity.entity_id);
           controllable.add(entity.entity_id);
         }
+        // Sensors are display-only: watched so they stream, never controllable.
+        for (const entity of panel.sensors ?? []) watched.add(entity.entity_id);
         break;
       case 'system':
         for (const metric of panel.metrics) watched.add(metric.entity_id);

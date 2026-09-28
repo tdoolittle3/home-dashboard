@@ -74,7 +74,16 @@ export function App() {
       );
     }
     if (panel.type === 'controls') {
-      return <ControlsPanel key={panel.id} title={panel.title} refs={panel.entities} entities={entities} />;
+      return (
+        <ControlsPanel
+          key={panel.id}
+          title={panel.title}
+          refs={panel.entities}
+          lights={panel.lights}
+          sensors={panel.sensors}
+          entities={entities}
+        />
+      );
     }
     if (panel.type === 'service') {
       switch (panel.service) {
