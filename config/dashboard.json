@@ -4,6 +4,7 @@
     "Edit this file and restart the server - no rebuild needed. It is mounted read-only in Docker.",
     "Panel order here is the order they render. The first 'cameras' panel is the hero row at the top.",
     "Panels of type 'controls' double as the write allowlist: /api/action refuses any entity not listed here.",
+    "A controls panel can also carry 'lights' (a strip of lamp buttons, listed in the order they sit in the room left to right, writable like 'entities') and 'sensors' (read-only door/leak status rows - watched, never writable).",
     "An 'entities' panel with \"chart\": \"disk\" also draws the largest filesystem Frigate reports.",
     "A 'service' panel shows one polled service in depth: \"service\" is uptimeKuma, jellyfin, immich or adguard. It needs that service's *_BASE_URL and *_API_KEY (for adguard: ADGUARD_USERNAME and ADGUARD_PASSWORD) in .env, and says so when they are missing.",
     "The adguard panel is read-only diagnostics - no protection toggle; writes stay HA-entity-only. Its header also shows the two Kuma monitors named exactly 'DNS resolver' and 'AdGuard UI'; rename them in Kuma and the dots go grey here.",
@@ -108,6 +109,19 @@
       "id": "controls",
       "title": "Controls",
       "type": "controls",
+      "lights": {
+        "name": "Living room",
+        "entities": [
+          { "entity_id": "switch.light_1", "name": "Left" },
+          { "entity_id": "switch.light_2", "name": "Middle" },
+          { "entity_id": "switch.light_3", "name": "Right" }
+        ]
+      },
+      "sensors": [
+        { "entity_id": "binary_sensor.living_room_front_door", "name": "Front door" },
+        { "entity_id": "binary_sensor.sun_room_sliding_glass_door", "name": "Sliding glass door" },
+        { "entity_id": "binary_sensor.sink_moisture_detector", "name": "Kitchen sink leak" }
+      ],
       "entities": [
         { "entity_id": "switch.frontcam_white_light", "name": "Driveway white light" }
       ]

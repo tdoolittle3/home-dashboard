@@ -124,6 +124,9 @@ rebuild. It
 is mounted read-only in the container.
 
 `controls` panels double as the write allowlist, so there is no second list to drift out of sync.
+Besides plain `entities` toggle rows, a controls panel can carry a `lights` group — a strip of lamp
+buttons listed in the order they sit in the room, left to right, writable like `entities` — and
+`sensors`, read-only door/leak status rows that are watched but never join the allowlist.
 
 `service` panels show one polled service in depth; `"service"` is `uptimeKuma`, `jellyfin`,
 `immich` or `adguard`. Each needs its `*_BASE_URL` and credentials (`*_API_KEY`, or

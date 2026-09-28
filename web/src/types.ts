@@ -61,7 +61,16 @@ export type Panel =
       /** Draw the largest filesystem Frigate reports above the rows. */
       chart?: 'disk';
     }
-  | { id: string; title: string; type: 'controls'; entities: EntityRef[] }
+  | {
+      id: string;
+      title: string;
+      type: 'controls';
+      entities: EntityRef[];
+      /** Lamp buttons drawn in this order, left to right, matching the room. Writable. */
+      lights?: { name?: string; entities: EntityRef[] };
+      /** Read-only status rows (doors, leak sensors). */
+      sensors?: EntityRef[];
+    }
   | { id: string; title: string; type: 'cameras'; cameras: CameraRef[]; refreshSeconds?: number }
   | { id: string; title: string; type: 'service'; service: ServiceName }
   | { id: string; title: string; type: 'system'; metrics: SystemMetricRef[] }

@@ -23,6 +23,8 @@
   --down: #e5646e;
   --warn: #d9a441;
   --idle: #6b7280;
+  /* A lit bulb. Warmer than --warn on purpose: lamplight, not a warning. */
+  --lamp-on: #ffd479;
   /* Text and scrim that sit on top of camera stills, whatever their content. */
   --on-media: #ffffff;
   --scrim: rgba(0, 0, 0, 0.72);
@@ -574,6 +576,189 @@ body {
 .toggle:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.toggle--small {
+  font-size: var(--fs-sm);
+  color: var(--text-dim);
+  padding: 4px 12px;
+  min-width: 0;
+}
+
+.toggle--small:hover:not(:disabled) {
+  color: var(--text);
+}
+
+/* The controls panel stacks up to three sections - lamp strip, sensor rows,
+   switch rows - and this gap is the only seam between them. */
+.controls {
+  display: grid;
+  gap: 12px;
+}
+
+/* --- lamp strip: one button per lamp, in room order --- */
+
+/* The strip mirrors the room: lamps render in the order configured, left to
+   right as they sit on the wall, so "which one is which" needs no legend. */
+.lamps {
+  display: grid;
+  gap: 10px;
+}
+
+.lamps__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.lamps__name {
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.lamps__all {
+  display: flex;
+  gap: 6px;
+}
+
+.lamps__row {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 10px;
+}
+
+.lamp {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  font: inherit;
+  font-size: var(--fs-sm);
+  color: var(--text-dim);
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-raised);
+  padding: 12px 8px 10px;
+  cursor: pointer;
+  transition:
+    border-color var(--motion-fast) var(--ease),
+    background var(--motion-fast) var(--ease),
+    box-shadow var(--motion-fast) var(--ease),
+    color var(--motion-fast) var(--ease);
+}
+
+.lamp:hover:not(:disabled) {
+  border-color: var(--accent);
+}
+
+.lamp:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.lamp:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.lamp__glyph {
+  width: 36px;
+  height: 40px;
+}
+
+.lamp__bulb {
+  fill: none;
+  stroke: var(--text-dim);
+  stroke-width: 2;
+  transition:
+    fill var(--motion-fast) var(--ease),
+    stroke var(--motion-fast) var(--ease);
+}
+
+.lamp__base {
+  fill: var(--text-dim);
+}
+
+.lamp__rays {
+  stroke: var(--lamp-on);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+}
+
+/* On: the button itself takes on a little of the light it is casting. */
+.lamp--on {
+  color: var(--text);
+  background: color-mix(in srgb, var(--lamp-on) 9%, var(--surface-raised));
+  border-color: color-mix(in srgb, var(--lamp-on) 45%, var(--border));
+  box-shadow:
+    var(--shadow-raised),
+    0 0 22px -6px color-mix(in srgb, var(--lamp-on) 55%, transparent);
+}
+
+.lamp--on .lamp__bulb {
+  fill: color-mix(in srgb, var(--lamp-on) 88%, white);
+  stroke: var(--lamp-on);
+  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--lamp-on) 70%, transparent));
+}
+
+.lamp--on .lamp__base {
+  fill: color-mix(in srgb, var(--lamp-on) 60%, var(--text-dim));
+}
+
+/* --- sensor state: a dot and a word, quiet until something is open or wet --- */
+
+.sense {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.sense__dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--idle);
+  flex: none;
+}
+
+.sense--ok .sense__dot {
+  background: var(--up);
+}
+
+.sense--open {
+  color: var(--text);
+}
+
+.sense--open .sense__dot {
+  background: var(--warn);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--warn) 30%, transparent);
+}
+
+.sense--alert {
+  color: var(--down);
+}
+
+.sense--alert .sense__dot {
+  background: var(--down);
+  animation: sense-pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes sense-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--down) 35%, transparent);
+  }
+  50% {
+    box-shadow: 0 0 0 6px color-mix(in srgb, var(--down) 12%, transparent);
+  }
 }
 
 /* --- misc --- */
@@ -1520,7 +1705,8 @@ body {
   .tile__dot--up,
   .ups__banner--critical .ups__banner-title,
   .ups--critical .ups__gauge-fill,
-  .badge--emergency {
+  .badge--emergency,
+  .sense--alert .sense__dot {
     animation: none;
   }
 }

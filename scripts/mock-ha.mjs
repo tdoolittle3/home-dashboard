@@ -145,6 +145,14 @@ function hostEntities() {
     val('ladybird_storage_frigate_recordings', 'Frigate recordings', 214, 'GB'),
     val('ladybird_storage_media_library', 'Media library', 187, 'GB'),
     entity('switch.frontcam_white_light', 'off', { friendly_name: 'Driveway white light' }),
+    // The living room Zigbee plugs and contact/leak sensors: one lamp lit, one
+    // door open, so a preview shows the strip and the sensor tones together.
+    entity('switch.light_1', 'on', { friendly_name: 'Light 1' }),
+    entity('switch.light_2', 'off', { friendly_name: 'Light 2' }),
+    entity('switch.light_3', 'on', { friendly_name: 'Light 3' }),
+    entity('binary_sensor.living_room_front_door', 'off', { friendly_name: 'Front Door', device_class: 'opening' }, 7_200),
+    entity('binary_sensor.sun_room_sliding_glass_door', 'on', { friendly_name: 'Sliding Glass Door', device_class: 'opening' }, 340),
+    entity('binary_sensor.sink_moisture_detector', 'off', { friendly_name: 'Sink moisture detector', device_class: 'moisture' }, 86_400),
   ];
 }
 
