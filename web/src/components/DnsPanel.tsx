@@ -1,5 +1,6 @@
 import { formatNumber, formatRelative } from '../format';
 import type { AdguardSummary, AdguardTopEntry, KumaStatus, KumaSummary, SourceResult } from '../types';
+import { Collapsible } from './Collapsible';
 import { ServicePanel } from './ServicePanel';
 
 interface DnsPanelProps {
@@ -96,33 +97,37 @@ export function DnsPanel({ title, result, kuma }: DnsPanelProps) {
             </p>
           ) : null}
 
-          <TopList heading="Top blocked" entries={data.topBlocked} />
-          <TopList heading="Top clients" entries={data.topClients} />
+          {data.topBlocked.length > 0 || data.topClients.length > 0 || data.recentQueries.length > 0 ? (
+            <Collapsible label="domains & queries">
+              <TopList heading="Top blocked" entries={data.topBlocked} />
+              <TopList heading="Top clients" entries={data.topClients} />
 
-          {data.recentQueries.length > 0 ? (
-            <>
-              <h3 className="subhead">Recent queries</h3>
-              <ul className="rows rows--tight">
-                {data.recentQueries.map((query, index) => (
-                  <li key={`${query.time ?? ''}-${query.domain}-${index}`} className="row">
-                    <span className="row__label row__label--dotted">
-                      <span className={`dot dot--${query.blocked ? 'down' : 'up'}`} aria-hidden="true" />
-                      <span className="row__text">
-                        <span className="row__title">{query.domain}</span>
-                        {query.client ? <span className="row__sub">{query.client}</span> : null}
-                      </span>
-                    </span>
-                    <span
-                      className={query.blocked ? 'row__value row__value--alert' : 'row__value row__value--quiet'}
-                      {...(query.blocked && query.reason ? { title: query.reason } : {})}
-                    >
-                      {query.blocked ? 'blocked' : 'ok'}
-                    </span>
-                    <span className="row__meta">{formatRelative(query.time)}</span>
-                  </li>
-                ))}
-              </ul>
-            </>
+              {data.recentQueries.length > 0 ? (
+                <>
+                  <h3 className="subhead">Recent queries</h3>
+                  <ul className="rows rows--tight">
+                    {data.recentQueries.map((query, index) => (
+                      <li key={`${query.time ?? ''}-${query.domain}-${index}`} className="row">
+                        <span className="row__label row__label--dotted">
+                          <span className={`dot dot--${query.blocked ? 'down' : 'up'}`} aria-hidden="true" />
+                          <span className="row__text">
+                            <span className="row__title">{query.domain}</span>
+                            {query.client ? <span className="row__sub">{query.client}</span> : null}
+                          </span>
+                        </span>
+                        <span
+                          className={query.blocked ? 'row__value row__value--alert' : 'row__value row__value--quiet'}
+                          {...(query.blocked && query.reason ? { title: query.reason } : {})}
+                        >
+                          {query.blocked ? 'blocked' : 'ok'}
+                        </span>
+                        <span className="row__meta">{formatRelative(query.time)}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </>
+              ) : null}
+            </Collapsible>
           ) : null}
         </>
       )}
