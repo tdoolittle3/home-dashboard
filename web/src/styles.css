@@ -1319,15 +1319,19 @@ body {
 }
 
 /* iOS 26/27 undercount the home-screen app's layout viewport by the top
-   safe-area inset, so a fixed overlay's bottom: 0 stops a status-bar-sized
-   band short of the screen edge with the dashboard showing through. Only the
-   large viewport unit still spans the whole screen there, so run standalone
-   the viewer takes its height from that instead of its bottom edge. */
+   safe-area inset, so a fixed overlay's inset: 0 leaves a status-bar-sized
+   band of the page showing through. Which edge loses varies by build: some
+   anchor the fixed layer at the screen top (band at the bottom), the user's
+   anchors it below the status bar (band at the top, header visible). So the
+   viewer starts one top inset above its anchor and runs one large-viewport
+   height plus that inset down from there: wherever the anchor sits, the
+   screen is covered, and any overhang past an edge is just clipped. */
 @supports (height: 100lvh) {
   @media (display-mode: standalone) {
     .viewer {
+      top: calc(-1 * env(safe-area-inset-top, 0px));
       bottom: auto;
-      height: 100lvh;
+      height: calc(100lvh + env(safe-area-inset-top, 0px));
     }
   }
 }
