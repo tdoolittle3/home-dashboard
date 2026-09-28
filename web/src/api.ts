@@ -1,4 +1,12 @@
-import type { ControlAction, EntitySnapshot, HaStatus, HistoryPoint, Snapshot, SourcesSnapshot } from './types';
+import type {
+  ControlAction,
+  EntitySnapshot,
+  HaStatus,
+  HistoryPoint,
+  MeshSummary,
+  Snapshot,
+  SourcesSnapshot,
+} from './types';
 
 export async function fetchSnapshot(): Promise<Snapshot> {
   const response = await fetch('/api/dashboard');
@@ -25,11 +33,24 @@ export async function sendAction(entityId: string, action: ControlAction): Promi
   }
 }
 
+export async function sendMeshText(text: string): Promise<void> {
+  const response = await fetch('/api/mesh/send', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ text }),
+  });
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(body?.error ?? `mesh send failed: ${response.status}`);
+  }
+}
+
 export interface StreamHandlers {
   onSnapshot: (snapshot: Snapshot) => void;
   onEntity: (entity: EntitySnapshot) => void;
   onHaStatus: (status: HaStatus) => void;
   onSources: (sources: SourcesSnapshot) => void;
+  onMesh: (mesh: MeshSummary) => void;
   onOpen: () => void;
   onError: () => void;
 }
@@ -54,6 +75,7 @@ export function openStream(handlers: StreamHandlers): () => void {
   listen<EntitySnapshot>('state', handlers.onEntity);
   listen<HaStatus>('ha', handlers.onHaStatus);
   listen<SourcesSnapshot>('sources', handlers.onSources);
+  listen<MeshSummary>('mesh', handlers.onMesh);
 
   return () => source.close();
 }

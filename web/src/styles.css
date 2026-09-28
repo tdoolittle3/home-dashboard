@@ -1721,3 +1721,89 @@ body {
   color: var(--text-dim);
 }
 
+
+/* --- mesh panel: chat feed, send box, node roster --- */
+
+.mesh__feed {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 280px;
+  overflow-y: auto;
+  border-radius: var(--radius-sm);
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+}
+
+.mesh__msg {
+  max-width: 85%;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Messages sent from this dashboard sit on the right, accent-edged, so the
+   two directions read apart at a glance. */
+.mesh__msg--self {
+  align-self: flex-end;
+  text-align: right;
+}
+
+.mesh__msg-meta {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  font-size: var(--fs-xs);
+  color: var(--text-dim);
+}
+
+.mesh__msg--self .mesh__msg-meta {
+  justify-content: flex-end;
+}
+
+.mesh__msg-sender {
+  font-weight: 600;
+  color: var(--text);
+}
+
+.mesh__msg--self .mesh__msg-sender {
+  color: var(--accent);
+}
+
+.mesh__msg-text {
+  overflow-wrap: anywhere;
+}
+
+.mesh__send {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.mesh__send input {
+  flex: 1;
+  min-width: 0;
+  font: inherit;
+  color: var(--text);
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 6px 14px;
+}
+
+.mesh__send input:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.mesh__send input:disabled {
+  color: var(--text-dim);
+  cursor: not-allowed;
+}
+
+.mesh__nodes {
+  margin-top: 10px;
+}

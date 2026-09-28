@@ -61,6 +61,9 @@ export function useDashboard(): DashboardHook {
           current ? { ...current, sources, generatedAt: new Date().toISOString() } : current,
         );
       },
+      onMesh: (mesh) => {
+        setSnapshot((current) => (current ? { ...current, mesh } : current));
+      },
     });
 
     return close;

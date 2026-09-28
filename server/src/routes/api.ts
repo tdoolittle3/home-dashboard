@@ -3,10 +3,16 @@ import type { ReadableStream as WebReadableStream } from 'node:stream/web';
 import type { FastifyInstance } from 'fastify';
 import type { AppConfig } from '../config.js';
 import type { HaClient } from '../ha/client.js';
+import type { MeshClient } from '../mesh/client.js';
 import type { SnapshotBuilder } from '../snapshot.js';
 import { fetchWithTimeout, getJson } from '../sources/http.js';
 
 const ACTIONS = new Set(['turn_on', 'turn_off', 'toggle']);
+
+/** A LoRa text payload tops out around 230 bytes; stop short of it. */
+const MESH_TEXT_MAX_BYTES = 200;
+/** One message per this many ms - LoRa airtime is a shared resource. */
+const MESH_SEND_COOLDOWN_MS = 2_000;
 
 /** One recorded state in HA's REST history reply, trimmed by minimal_response. */
 interface HistoryRow {
@@ -44,6 +50,7 @@ export function registerApiRoutes(
   config: AppConfig,
   ha: HaClient,
   snapshots: SnapshotBuilder,
+  mesh: MeshClient | null = null,
 ): void {
   app.get('/api/health', async () => ({
     ok: true,
@@ -126,6 +133,49 @@ export function registerApiRoutes(
     }
 
     // The resulting state arrives over /api/stream; do not guess it here.
+    return reply.code(202).send({ accepted: true });
+  });
+
+  /**
+   * The mesh write path, gated the same way as /api/action: the feature only
+   * works when it was deliberately configured - a `mesh` panel in
+   * dashboard.json is the allowlist, and the send env vars are the credential.
+   */
+  const meshPanelConfigured = config.dashboard.panels.some((panel) => panel.type === 'mesh');
+  let meshLastSendAt = 0;
+
+  app.post('/api/mesh/send', async (request, reply) => {
+    if (!mesh || !meshPanelConfigured) {
+      return reply.code(403).send({ error: 'mesh send is not enabled on this dashboard' });
+    }
+
+    const body = (request.body ?? {}) as { text?: unknown };
+    const text = typeof body.text === 'string' ? body.text.trim() : '';
+    if (text.length === 0) {
+      return reply.code(400).send({ error: 'text must be a non-empty string' });
+    }
+    if (Buffer.byteLength(text, 'utf8') > MESH_TEXT_MAX_BYTES) {
+      return reply.code(400).send({ error: `text must fit in ${MESH_TEXT_MAX_BYTES} bytes` });
+    }
+    if (!mesh.canSend) {
+      // Either the broker is down or MESH_GATEWAY_NODE / MESH_CHANNEL_INDEX
+      // are unset (read-only mode); the status pill already says which.
+      return reply.code(503).send({ error: 'mesh send is not available right now' });
+    }
+    const now = Date.now();
+    if (now - meshLastSendAt < MESH_SEND_COOLDOWN_MS) {
+      return reply.code(429).send({ error: 'sending too fast - LoRa airtime is shared' });
+    }
+
+    try {
+      mesh.send(text);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      return reply.code(502).send({ error: message });
+    }
+    meshLastSendAt = now;
+
+    // The echoed message arrives over the `mesh` stream event; do not guess here.
     return reply.code(202).send({ accepted: true });
   });
 

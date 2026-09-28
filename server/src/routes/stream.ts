@@ -1,9 +1,12 @@
 import type { FastifyInstance } from 'fastify';
 import type { AppConfig } from '../config.js';
 import type { HaClient } from '../ha/client.js';
+import type { MeshClient } from '../mesh/client.js';
 import { toEntitySnapshot, type SnapshotBuilder } from '../snapshot.js';
 
 const HEARTBEAT_MS = 20_000;
+/** Mesh telemetry arrives in clumps; coalesce them into one frame. */
+const MESH_DEBOUNCE_MS = 250;
 
 /**
  * Server-sent events rather than a WebSocket: the payload only ever flows
@@ -15,6 +18,7 @@ export function registerStreamRoute(
   config: AppConfig,
   ha: HaClient,
   snapshots: SnapshotBuilder,
+  mesh: MeshClient | null = null,
 ): void {
   const watched = new Set(config.watchedEntities);
 
@@ -45,6 +49,19 @@ export function registerStreamRoute(
 
     const offStatus = ha.addStatusListener((status) => send('ha', status));
 
+    // Mesh state is event-driven like `state`, not polled like `sources` - a
+    // chat message should not wait for the 15s source push. The whole summary
+    // is small, so each frame replaces the slice wholesale.
+    let meshTimer: NodeJS.Timeout | null = null;
+    const offMesh = mesh
+      ? mesh.addListener(() => {
+          meshTimer ??= setTimeout(() => {
+            meshTimer = null;
+            send('mesh', mesh.summary());
+          }, MESH_DEBOUNCE_MS);
+        })
+      : null;
+
     const sourceTimer = setInterval(() => {
       void snapshots.sources().then((sources) => send('sources', sources));
     }, config.sourcePushMs);
@@ -58,6 +75,8 @@ export function registerStreamRoute(
       open = false;
       offState();
       offStatus();
+      offMesh?.();
+      if (meshTimer) clearTimeout(meshTimer);
       clearInterval(sourceTimer);
       clearInterval(heartbeat);
       response.end();
