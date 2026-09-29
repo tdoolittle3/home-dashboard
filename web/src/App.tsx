@@ -140,16 +140,17 @@ export function App() {
               <span className="pill__dot" aria-hidden="true" />
               {STREAM_LABEL[stream] ?? stream}
             </span>
-            {dashboard.outdoor ? (
-              <span className="topbar__meta">
-                {formatState(entities[dashboard.outdoor.temperature])} ·{' '}
-                {formatState(entities[dashboard.outdoor.humidity])}
-              </span>
-            ) : (
+            {dashboard.outdoor ? null : (
               <span className="topbar__meta">updated {formatRelative(snapshot.generatedAt)}</span>
             )}
           </div>
         </div>
+        {dashboard.outdoor ? (
+          <span className="topbar__meta topbar__meta--outdoor">
+            {formatState(entities[dashboard.outdoor.temperature])} ·{' '}
+            {formatState(entities[dashboard.outdoor.humidity])}
+          </span>
+        ) : null}
       </header>
 
       {cameraPanels.length > 0 ? <div className="hero">{cameraPanels.map(renderPanel)}</div> : null}
