@@ -153,6 +153,12 @@ body {
   font-size: var(--fs-sm);
 }
 
+/* Keeps the outdoor pair pinned to the right edge even when the bar wraps. */
+.topbar__meta--outdoor {
+  margin-left: auto;
+  text-align: right;
+}
+
 .pill {
   display: inline-flex;
   align-items: center;
