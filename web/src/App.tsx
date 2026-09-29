@@ -12,7 +12,7 @@ import { StoragePanel } from './components/StoragePanel';
 import { SystemPanel } from './components/SystemPanel';
 import { UpsPanel } from './components/UpsPanel';
 import { UptimePanel } from './components/UptimePanel';
-import { formatRelative } from './format';
+import { formatRelative, formatState } from './format';
 import type { Panel } from './types';
 import { useDashboard } from './useDashboard';
 import { useMediaQuery } from './useMediaQuery';
@@ -140,7 +140,14 @@ export function App() {
               <span className="pill__dot" aria-hidden="true" />
               {STREAM_LABEL[stream] ?? stream}
             </span>
-            <span className="topbar__meta">updated {formatRelative(snapshot.generatedAt)}</span>
+            {dashboard.outdoor ? (
+              <span className="topbar__meta">
+                {formatState(entities[dashboard.outdoor.temperature])} ·{' '}
+                {formatState(entities[dashboard.outdoor.humidity])}
+              </span>
+            ) : (
+              <span className="topbar__meta">updated {formatRelative(snapshot.generatedAt)}</span>
+            )}
           </div>
         </div>
       </header>

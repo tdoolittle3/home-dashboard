@@ -113,10 +113,17 @@ export interface ServiceLink {
   health?: string;
 }
 
+/** The outdoor pair the topbar shows instead of the "updated ..." label. Mirrors OutdoorRefs in server/src/config.ts. */
+export interface OutdoorRefs {
+  temperature: string;
+  humidity: string;
+}
+
 export interface DashboardConfig {
   title: string;
   panels: Panel[];
   links: ServiceLink[];
+  outdoor?: OutdoorRefs;
 }
 
 export type SourceResult<T> = { ok: true; data: T } | { ok: false; error: string };

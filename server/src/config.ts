@@ -125,10 +125,19 @@ export interface ServiceLink {
   health?: string;
 }
 
+/** The outdoor pair the topbar shows instead of the "updated ..." label. */
+export interface OutdoorRefs {
+  temperature: string;
+  humidity: string;
+}
+
+export const OUTDOOR_ROLES = ['temperature', 'humidity'] as const;
+
 export interface DashboardConfig {
   title: string;
   panels: Panel[];
   links: ServiceLink[];
+  outdoor?: OutdoorRefs;
 }
 
 export interface AppConfig {
@@ -364,10 +373,19 @@ function loadDashboard(path: string): DashboardConfig {
     }
   }
 
+  if (parsed.outdoor !== undefined) {
+    for (const role of OUTDOOR_ROLES) {
+      if (!ENTITY_ID.test(parsed.outdoor[role] ?? '')) {
+        throw new Error(`${path}: "outdoor" has a missing or invalid "${role}" entity_id`);
+      }
+    }
+  }
+
   return {
     title: parsed.title ?? 'Home',
     panels: parsed.panels,
     links,
+    outdoor: parsed.outdoor,
   };
 }
 
@@ -406,6 +424,10 @@ export function loadConfig(): AppConfig {
         // These panels read their own APIs, not HA entities.
         break;
     }
+  }
+
+  if (dashboard.outdoor) {
+    for (const role of OUTDOOR_ROLES) watched.add(dashboard.outdoor[role]);
   }
 
   const jellyfinBase = optional('JELLYFIN_BASE_URL');
