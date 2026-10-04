@@ -149,6 +149,9 @@ export interface FrigateSummary {
     score: number | null;
     hasSnapshot: boolean;
     hasClip: boolean;
+    zones: string[];
+    /** Near-duplicate detections folded into this row; 1 when nothing was. */
+    count: number;
   }[];
 }
 

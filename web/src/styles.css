@@ -432,6 +432,33 @@ body {
   white-space: nowrap;
 }
 
+/* A detection row that opens its Frigate clip: the anchor carries the grid so
+   the whole row, not just the text, is the click target. */
+.row.row--event {
+  display: block;
+  padding: 0;
+}
+
+.row__link {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 8px;
+  border-radius: var(--radius-xs);
+  color: inherit;
+  text-decoration: none;
+}
+
+.row__link:hover .row__label {
+  color: var(--text);
+}
+
+.row__repeat {
+  color: var(--idle);
+  font-variant-numeric: tabular-nums;
+}
+
 /* A control row is about the thing being switched, so the label leads. */
 .row--control .row__label {
   color: var(--text);

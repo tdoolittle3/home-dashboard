@@ -13,6 +13,23 @@ interface CamerasPanelProps {
   stillHeight?: number;
   /** Recent detections render under the stills they came from, not in Services. */
   frigate?: SourceResult<FrigateSummary> | null;
+  /** Browser-facing Frigate address (the port-5000 link). Without it detections stay plain text. */
+  frigateUrl?: string;
+}
+
+type FrigateEventRow = FrigateSummary['recentEvents'][number];
+
+/**
+ * Where a detection row leads: the clip itself, or its snapshot while Frigate
+ * has no clip yet. Frigate serves both from its API on the same port as the UI.
+ */
+function eventHref(base: string | undefined, event: FrigateEventRow): string | undefined {
+  if (!base) return undefined;
+  const root = base.replace(/\/+$/, '');
+  const id = encodeURIComponent(event.id);
+  if (event.hasClip) return `${root}/api/events/${id}/clip.mp4`;
+  if (event.hasSnapshot) return `${root}/api/events/${id}/snapshot.jpg`;
+  return undefined;
 }
 
 /**
@@ -21,7 +38,14 @@ interface CamerasPanelProps {
  * Frigate encodes MJPEG per connected viewer. The live stream runs only in the
  * full-screen viewer, where someone has deliberately opened one camera.
  */
-export function CamerasPanel({ title, cameras, refreshSeconds, stillHeight = 360, frigate }: CamerasPanelProps) {
+export function CamerasPanel({
+  title,
+  cameras,
+  refreshSeconds,
+  stillHeight = 360,
+  frigate,
+  frigateUrl,
+}: CamerasPanelProps) {
   const [tick, setTick] = useState(() => Date.now());
   const [viewing, setViewing] = useState<number | null>(null);
   const viewingCamera = viewing === null ? undefined : cameras[viewing];
@@ -70,17 +94,32 @@ export function CamerasPanel({ title, cameras, refreshSeconds, stillHeight = 360
         <>
           <h3 className="subhead">Recent detections</h3>
           <ul className="rows rows--tight rows--stamped">
-            {frigate.data.recentEvents.slice(0, 5).map((event) => (
-              <li key={event.id} className="row">
-                <span className="row__label">
-                  {event.label} · {event.camera}
-                </span>
-                <span className="row__value">
-                  {event.score === null ? '' : `${Math.round(event.score * 100)}%`}
-                </span>
-                <span className="row__meta">{formatEventTime(event.startTime)}</span>
-              </li>
-            ))}
+            {frigate.data.recentEvents.slice(0, 5).map((event) => {
+              const href = eventHref(frigateUrl, event);
+              const content = (
+                <>
+                  <span className="row__label">
+                    {event.label} · {event.camera}
+                    {event.count > 1 ? <span className="row__repeat"> ×{event.count}</span> : null}
+                  </span>
+                  <span className="row__value">
+                    {event.score === null ? '' : `${Math.round(event.score * 100)}%`}
+                  </span>
+                  <span className="row__meta">{formatEventTime(event.startTime)}</span>
+                </>
+              );
+              return href ? (
+                <li key={event.id} className="row row--event">
+                  <a className="row__link" href={href} target="_blank" rel="noreferrer">
+                    {content}
+                  </a>
+                </li>
+              ) : (
+                <li key={event.id} className="row">
+                  {content}
+                </li>
+              );
+            })}
           </ul>
         </>
       ) : null}

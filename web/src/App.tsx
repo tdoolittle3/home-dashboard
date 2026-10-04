@@ -70,6 +70,7 @@ export function App() {
           refreshSeconds={panel.refreshSeconds ?? 5}
           stillHeight={540}
           frigate={sources.frigate}
+          frigateUrl={dashboard.links.find((link) => link.service === 'frigate')?.url}
         />
       );
     }
