@@ -125,6 +125,7 @@
       "sensors": [
         { "entity_id": "binary_sensor.living_room_front_door", "name": "Front door" },
         { "entity_id": "binary_sensor.sun_room_sliding_glass_door", "name": "Sliding glass door" },
+        { "entity_id": "binary_sensor.garage_door", "name": "Garage door" },
         { "entity_id": "binary_sensor.sink_moisture_detector", "name": "Kitchen sink leak" }
       ],
       "entities": [
