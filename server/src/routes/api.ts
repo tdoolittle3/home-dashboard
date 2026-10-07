@@ -217,6 +217,95 @@ export function registerApiRoutes(
   );
 
   /**
+   * Detection clips and snapshots, proxied for the same reason as the stills.
+   * The clip is buffered so byte-range requests can be answered here: Frigate's
+   * nginx streams clips chunked with no range support, and iPhone Safari will
+   * not play an MP4 from a server that cannot serve ranges.
+   */
+  const EVENT_ID = /^[\w.-]+$/;
+
+  /**
+   * Guards both event media routes; null means the reply was already sent.
+   * The event is looked up first so only cameras the dashboard already shows
+   * are served - the same boundary proxyableCameras draws for the stills.
+   */
+  const eventBase = async (
+    id: string,
+    reply: { code: (status: number) => { send: (body: unknown) => unknown } },
+  ): Promise<string | null> => {
+    if (!config.frigate) {
+      reply.code(503).send({ error: 'FRIGATE_BASE_URL is not configured' });
+      return null;
+    }
+    if (!EVENT_ID.test(id)) {
+      reply.code(404).send({ error: 'unknown event' });
+      return null;
+    }
+    const base = `${config.frigate.baseUrl}/api/events/${encodeURIComponent(id)}`;
+    try {
+      const event = await getJson<{ camera?: unknown }>(base, { timeoutMs: 8_000 });
+      if (typeof event.camera === 'string' && config.proxyableCameras.has(event.camera)) return base;
+    } catch {
+      // Expired or never existed - same answer either way.
+    }
+    reply.code(404).send({ error: 'unknown event' });
+    return null;
+  };
+
+  app.get<{ Params: { id: string } }>('/api/events/:id/snapshot.jpg', async (request, reply) => {
+    const base = await eventBase(request.params.id, reply);
+    if (!base) return;
+
+    try {
+      const upstream = await fetchWithTimeout(`${base}/snapshot.jpg`, { timeoutMs: 8_000 });
+      if (!upstream.ok) {
+        return reply.code(502).send({ error: `frigate returned ${upstream.status}` });
+      }
+      return reply
+        .header('Content-Type', upstream.headers.get('content-type') ?? 'image/jpeg')
+        .header('Cache-Control', 'no-store')
+        .send(Buffer.from(await upstream.arrayBuffer()));
+    } catch (error) {
+      return reply.code(502).send({ error: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
+  app.get<{ Params: { id: string } }>('/api/events/:id/clip.mp4', async (request, reply) => {
+    const base = await eventBase(request.params.id, reply);
+    if (!base) return;
+
+    let clip: Buffer;
+    try {
+      // Event clips run seconds, not minutes; whole-clip buffering stays small
+      // and is what makes the range handling below possible.
+      const upstream = await fetchWithTimeout(`${base}/clip.mp4`, { timeoutMs: 30_000 });
+      if (!upstream.ok) {
+        return reply.code(502).send({ error: `frigate returned ${upstream.status}` });
+      }
+      clip = Buffer.from(await upstream.arrayBuffer());
+    } catch (error) {
+      return reply.code(502).send({ error: error instanceof Error ? error.message : String(error) });
+    }
+
+    reply.header('Content-Type', 'video/mp4').header('Cache-Control', 'no-store').header('Accept-Ranges', 'bytes');
+
+    const match = /^bytes=(\d*)-(\d*)$/.exec(request.headers.range ?? '');
+    if (match && (match[1] || match[2])) {
+      // bytes=a-b and bytes=a- read from a; bytes=-n is the final n bytes.
+      const start = match[1] ? Number(match[1]) : Math.max(0, clip.length - Number(match[2]));
+      const end = match[1] && match[2] ? Math.min(Number(match[2]), clip.length - 1) : clip.length - 1;
+      if (start >= clip.length || start > end) {
+        return reply.code(416).header('Content-Range', `bytes */${clip.length}`).send();
+      }
+      return reply
+        .code(206)
+        .header('Content-Range', `bytes ${start}-${end}/${clip.length}`)
+        .send(clip.subarray(start, end + 1));
+    }
+    return reply.send(clip);
+  });
+
+  /**
    * Live view: pipes Frigate's MJPEG stream for a camera straight through to
    * the browser. Frigate JPEG-encodes every frame per connected viewer, so the
    * client abort is propagated upstream the moment a tab goes away - otherwise
