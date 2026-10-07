@@ -13,22 +13,21 @@ interface CamerasPanelProps {
   stillHeight?: number;
   /** Recent detections render under the stills they came from, not in Services. */
   frigate?: SourceResult<FrigateSummary> | null;
-  /** Browser-facing Frigate address (the port-5000 link). Without it detections stay plain text. */
-  frigateUrl?: string;
 }
 
 type FrigateEventRow = FrigateSummary['recentEvents'][number];
 
 /**
  * Where a detection row leads: the clip itself, or its snapshot while Frigate
- * has no clip yet. Frigate serves both from its API on the same port as the UI.
+ * has no clip yet. Both come from this dashboard's own origin - the server
+ * proxies them, because a device that can reach the dashboard may have no
+ * route to Frigate's port, and Frigate cannot answer the byte-range requests
+ * iPhone Safari demands before it will play an MP4.
  */
-function eventHref(base: string | undefined, event: FrigateEventRow): string | undefined {
-  if (!base) return undefined;
-  const root = base.replace(/\/+$/, '');
+function eventHref(event: FrigateEventRow): string | undefined {
   const id = encodeURIComponent(event.id);
-  if (event.hasClip) return `${root}/api/events/${id}/clip.mp4`;
-  if (event.hasSnapshot) return `${root}/api/events/${id}/snapshot.jpg`;
+  if (event.hasClip) return `/api/events/${id}/clip.mp4`;
+  if (event.hasSnapshot) return `/api/events/${id}/snapshot.jpg`;
   return undefined;
 }
 
@@ -44,7 +43,6 @@ export function CamerasPanel({
   refreshSeconds,
   stillHeight = 360,
   frigate,
-  frigateUrl,
 }: CamerasPanelProps) {
   const [tick, setTick] = useState(() => Date.now());
   const [viewing, setViewing] = useState<number | null>(null);
@@ -95,7 +93,7 @@ export function CamerasPanel({
           <h3 className="subhead">Recent detections</h3>
           <ul className="rows rows--tight rows--stamped">
             {frigate.data.recentEvents.slice(0, 5).map((event) => {
-              const href = eventHref(frigateUrl, event);
+              const href = eventHref(event);
               const content = (
                 <>
                   <span className="row__label">
