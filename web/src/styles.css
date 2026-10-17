@@ -287,6 +287,18 @@ body {
   text-align: right;
 }
 
+/* An outbound link sitting in a panel's aside, like the ADS-B full-map link. */
+.panel__open {
+  margin-left: 12px;
+  color: var(--accent);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.panel__open:hover {
+  text-decoration: underline;
+}
+
 .panel__body {
   padding: 12px 20px 20px;
 }

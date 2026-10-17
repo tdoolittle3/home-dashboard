@@ -71,7 +71,18 @@ export type Panel =
       sensors?: EntityRef[];
     }
   | { id: string; title: string; type: 'cameras'; cameras: CameraRef[]; refreshSeconds?: number }
-  | { id: string; title: string; type: 'service'; service: ServiceName }
+  | {
+      id: string;
+      title: string;
+      type: 'service';
+      service: ServiceName;
+      /**
+       * Browser-facing URL rendered as the panel's "Open chat" link - the
+       * llamaSwap panel's way into its web UI. Like `links[].url`, this is what
+       * the browser opens, so it is the Tailscale FQDN, never a LAN IP.
+       */
+      chat?: string;
+    }
   | {
       id: string;
       title: string;
@@ -103,7 +114,7 @@ export type Panel =
     };
 
 /** Polled services that get a panel of their own. Each needs its `*_BASE_URL` and credentials in .env. */
-export const SERVICE_NAMES = ['uptimeKuma', 'jellyfin', 'immich', 'adguard'] as const;
+export const SERVICE_NAMES = ['uptimeKuma', 'jellyfin', 'immich', 'adguard', 'llamaSwap'] as const;
 export type ServiceName = (typeof SERVICE_NAMES)[number];
 
 /** The built-in Services tiles a link can attach its URL to. */
@@ -149,6 +160,7 @@ export interface AppConfig {
   uptimeKuma: { baseUrl: string; apiKey: string } | null;
   immich: { baseUrl: string; apiKey: string } | null;
   adguard: { baseUrl: string; username: string; password: string } | null;
+  llamaSwap: { baseUrl: string; apiKey: string } | null;
   /**
    * Meshtastic-over-MQTT. `channel` is the channel NAME (an uplink topic
    * segment); `channelIndex` is the numeric index downlink sends go out on -
@@ -348,6 +360,9 @@ function loadDashboard(path: string): DashboardConfig {
           `${path}: panel "${panel.id}" has unknown service "${panel.service}" - one of ${SERVICE_NAMES.join(', ')}`,
         );
       }
+      if (panel.chat !== undefined && !HTTP_URL.test(panel.chat)) {
+        throw new Error(`${path}: panel "${panel.id}" has a non-http(s) "chat" url`);
+      }
     } else {
       // `panel` has narrowed to never here, so read the raw JSON shape instead.
       const unknown = panel as unknown as { id: string; type: string };
@@ -440,6 +455,8 @@ export function loadConfig(): AppConfig {
   const adguardBase = optional('ADGUARD_BASE_URL');
   const adguardUser = optional('ADGUARD_USERNAME');
   const adguardPass = optional('ADGUARD_PASSWORD');
+  const llamaSwapBase = optional('LLAMA_SWAP_BASE_URL');
+  const llamaSwapKey = optional('LLAMA_SWAP_API_KEY');
 
   return {
     port: num('PORT', 8099),
@@ -453,6 +470,8 @@ export function loadConfig(): AppConfig {
       adguardBase && adguardUser && adguardPass
         ? { baseUrl: stripTrailingSlash(adguardBase), username: adguardUser, password: adguardPass }
         : null,
+    llamaSwap:
+      llamaSwapBase && llamaSwapKey ? { baseUrl: stripTrailingSlash(llamaSwapBase), apiKey: llamaSwapKey } : null,
     mesh: loadMesh(),
     sourceTtlMs: num('SOURCE_TTL_SECONDS', 10) * 1000,
     sourcePushMs: num('SOURCE_PUSH_SECONDS', 15) * 1000,

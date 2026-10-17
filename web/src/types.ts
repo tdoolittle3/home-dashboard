@@ -33,7 +33,7 @@ export interface CameraRef {
 }
 
 /** Polled services that get a panel of their own. Mirrors SERVICE_NAMES in server/src/config.ts. */
-export type ServiceName = 'uptimeKuma' | 'jellyfin' | 'immich' | 'adguard';
+export type ServiceName = 'uptimeKuma' | 'jellyfin' | 'immich' | 'adguard' | 'llamaSwap';
 
 export type SystemMetricKind = 'uptime' | 'percent' | 'value';
 
@@ -72,7 +72,14 @@ export type Panel =
       sensors?: EntityRef[];
     }
   | { id: string; title: string; type: 'cameras'; cameras: CameraRef[]; refreshSeconds?: number }
-  | { id: string; title: string; type: 'service'; service: ServiceName }
+  | {
+      id: string;
+      title: string;
+      type: 'service';
+      service: ServiceName;
+      /** Browser-facing URL for the panel's "Open chat" link (the llamaSwap panel's web UI). */
+      chat?: string;
+    }
   | { id: string; title: string; type: 'system'; metrics: SystemMetricRef[] }
   | { id: string; title: string; type: 'ups'; entities: UpsEntityRefs }
   | {
@@ -271,6 +278,26 @@ export interface AdguardSummary {
   lastError: string | null;
 }
 
+// Mirrors server/src/sources/llamaswap.ts.
+
+/** ready/starting/stopping are llama-swap's words; 'off' is a configured model with no process. */
+export type LlamaSwapState = 'ready' | 'starting' | 'stopping' | 'off';
+
+export interface LlamaSwapModel {
+  id: string;
+  name: string | null;
+  description: string | null;
+  state: LlamaSwapState;
+}
+
+export interface LlamaSwapSummary {
+  /** Every configured model, loaded first, then starting/stopping, then off. */
+  models: LlamaSwapModel[];
+  loaded: number;
+  /** Mid-swap (starting or stopping). */
+  inFlight: number;
+}
+
 export interface LinkHealth {
   label: string;
   up: boolean;
@@ -285,6 +312,7 @@ export interface SourcesSnapshot {
   uptimeKuma: SourceResult<KumaSummary> | null;
   immich: SourceResult<ImmichSummary> | null;
   adguard: SourceResult<AdguardSummary> | null;
+  llamaSwap: SourceResult<LlamaSwapSummary> | null;
   /** Liveness pings for the generic link tiles; null when no link has a health url. */
   linkHealth: SourceResult<LinkHealth[]> | null;
 }

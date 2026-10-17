@@ -3,6 +3,7 @@ import { CamerasPanel } from './components/CamerasPanel';
 import { ControlsPanel } from './components/ControlsPanel';
 import { DnsPanel } from './components/DnsPanel';
 import { EntitiesPanel } from './components/EntitiesPanel';
+import { InferencePanel } from './components/InferencePanel';
 import { Masonry } from './components/Masonry';
 import { MediaPanel } from './components/MediaPanel';
 import { MeshPanel } from './components/MeshPanel';
@@ -95,6 +96,8 @@ export function App() {
           return <PhotosPanel key={panel.id} title={panel.title} result={sources.immich} />;
         case 'adguard':
           return <DnsPanel key={panel.id} title={panel.title} result={sources.adguard} kuma={sources.uptimeKuma} />;
+        case 'llamaSwap':
+          return <InferencePanel key={panel.id} title={panel.title} result={sources.llamaSwap} chatUrl={panel.chat} />;
       }
     }
     if (panel.type === 'system') {

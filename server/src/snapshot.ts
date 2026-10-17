@@ -5,6 +5,7 @@ import { createFrigateSource, type FrigateSummary } from './sources/frigate.js';
 import { cached, toResult, type SourceResult } from './sources/http.js';
 import { createImmichSource, type ImmichSummary } from './sources/immich.js';
 import { createJellyfinSource, type JellyfinSummary } from './sources/jellyfin.js';
+import { createLlamaSwapSource, type LlamaSwapSummary } from './sources/llamaswap.js';
 import type { MeshClient, MeshSummary } from './mesh/client.js';
 import { createLinkHealthSource, type LinkHealth } from './sources/linkHealth.js';
 import { createUptimeKumaSource, type KumaSummary } from './sources/uptimeKuma.js';
@@ -32,6 +33,7 @@ export interface SourcesSnapshot {
   uptimeKuma: SourceResult<KumaSummary> | null;
   immich: SourceResult<ImmichSummary> | null;
   adguard: SourceResult<AdguardSummary> | null;
+  llamaSwap: SourceResult<LlamaSwapSummary> | null;
   /** Liveness pings for the generic link tiles; null when no link has a health url. */
   linkHealth: SourceResult<LinkHealth[]> | null;
 }
@@ -96,6 +98,7 @@ export class SnapshotBuilder {
   #uptimeKuma: (() => Promise<SourceResult<KumaSummary>>) | null;
   #immich: (() => Promise<SourceResult<ImmichSummary>>) | null;
   #adguard: (() => Promise<SourceResult<AdguardSummary>>) | null;
+  #llamaSwap: (() => Promise<SourceResult<LlamaSwapSummary>>) | null;
   #linkHealth: (() => Promise<SourceResult<LinkHealth[]>>) | null;
 
   constructor(config: AppConfig, ha: HaClient, mesh: MeshClient | null = null) {
@@ -104,7 +107,7 @@ export class SnapshotBuilder {
     this.#mesh = mesh;
 
     const ttl = config.sourceTtlMs;
-    const { frigate, jellyfin, uptimeKuma, immich, adguard } = config;
+    const { frigate, jellyfin, uptimeKuma, immich, adguard, llamaSwap } = config;
 
     const frigateSource = frigate ? createFrigateSource(frigate.baseUrl) : null;
     const jellyfinSource = jellyfin ? createJellyfinSource(jellyfin.baseUrl, jellyfin.apiKey) : null;
@@ -113,12 +116,14 @@ export class SnapshotBuilder {
     // The adguard source paces itself per endpoint (stats 30s, query log 10s,
     // backoff on errors); this outer cache only coalesces concurrent builds.
     const adguardSource = adguard ? createAdguardSource(adguard.baseUrl, adguard.username, adguard.password) : null;
+    const llamaSwapSource = llamaSwap ? createLlamaSwapSource(llamaSwap.baseUrl, llamaSwap.apiKey) : null;
 
     this.#frigate = frigateSource ? cached(ttl, () => toResult('frigate', frigateSource)) : null;
     this.#jellyfin = jellyfinSource ? cached(ttl, () => toResult('jellyfin', jellyfinSource)) : null;
     this.#uptimeKuma = kumaSource ? cached(ttl, () => toResult('uptime-kuma', kumaSource)) : null;
     this.#immich = immichSource ? cached(ttl, () => toResult('immich', immichSource)) : null;
     this.#adguard = adguardSource ? cached(ttl, () => toResult('adguard', adguardSource)) : null;
+    this.#llamaSwap = llamaSwapSource ? cached(ttl, () => toResult('llama-swap', llamaSwapSource)) : null;
 
     const healthLinks = config.dashboard.links.filter((link) => link.health !== undefined);
     const linkHealthSource = healthLinks.length > 0 ? createLinkHealthSource(healthLinks) : null;
@@ -134,15 +139,16 @@ export class SnapshotBuilder {
   }
 
   async sources(): Promise<SourcesSnapshot> {
-    const [frigate, jellyfin, uptimeKuma, immich, adguard, linkHealth] = await Promise.all([
+    const [frigate, jellyfin, uptimeKuma, immich, adguard, llamaSwap, linkHealth] = await Promise.all([
       this.#frigate ? this.#frigate() : Promise.resolve(null),
       this.#jellyfin ? this.#jellyfin() : Promise.resolve(null),
       this.#uptimeKuma ? this.#uptimeKuma() : Promise.resolve(null),
       this.#immich ? this.#immich() : Promise.resolve(null),
       this.#adguard ? this.#adguard() : Promise.resolve(null),
+      this.#llamaSwap ? this.#llamaSwap() : Promise.resolve(null),
       this.#linkHealth ? this.#linkHealth() : Promise.resolve(null),
     ]);
-    return { frigate, jellyfin, uptimeKuma, immich, adguard, linkHealth };
+    return { frigate, jellyfin, uptimeKuma, immich, adguard, llamaSwap, linkHealth };
   }
 
   async build(): Promise<Snapshot> {
