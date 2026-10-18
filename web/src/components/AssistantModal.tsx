@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 
 interface AssistantModalProps {
+  /** The dashboard title, so the chat's brand bar reads like the page it covers. */
+  title: string;
   onClose: () => void;
 }
 
@@ -39,7 +41,7 @@ function splitThink(raw: string): { thinking: string; answer: string } {
  * assistant message, so tokens show up as the model produces them - including
  * the long first-token pause while llama-swap swaps a cold model in.
  */
-export function AssistantModal({ onClose }: AssistantModalProps) {
+export function AssistantModal({ title, onClose }: AssistantModalProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
@@ -198,14 +200,28 @@ export function AssistantModal({ onClose }: AssistantModalProps) {
     }
   };
 
+  // The subheader names the conversation: the first thing asked, once there is
+  // one. Its ✕ lives there rather than beside the brand because the brand row
+  // shares the top of a home-screen app with the status bar, where iOS
+  // quietly ignores taps - one row further down, taps land.
+  const firstUser = messages.find((message) => message.role === 'user');
+  const chatTitle = firstUser
+    ? firstUser.content.length > 48
+      ? `${firstUser.content.slice(0, 48).trimEnd()}…`
+      : firstUser.content
+    : 'New chat';
+
   return (
     <div className="assistant" role="dialog" aria-modal="true" aria-label="Assistant chat">
-      <header className="assistant__top">
-        <h2>Assistant</h2>
+      <header className="assistant__brand">
+        <h1>{title}</h1>
+      </header>
+      <div className="assistant__sub">
+        <span className="assistant__subtitle">{chatTitle}</span>
         <button type="button" className="assistant__close" onClick={onClose} aria-label="Close the chat">
           ✕
         </button>
-      </header>
+      </div>
       <div className="assistant__scroll" ref={scrollRef}>
         {messages.length === 0 ? (
           <p className="empty">Runs on Snibbly, right here on the LAN. A cold model takes a moment to load.</p>
@@ -246,14 +262,6 @@ export function AssistantModal({ onClose }: AssistantModalProps) {
           void send();
         }}
       >
-        <button
-          type="button"
-          className="assistant__close assistant__close--composer"
-          onClick={onClose}
-          aria-label="Close the chat"
-        >
-          ✕
-        </button>
         <textarea
           ref={inputRef}
           className="assistant__input"

@@ -159,19 +159,22 @@ body {
   text-align: right;
 }
 
-/* The assistant button, dead centre of the bar (the .topbar is the positioning
-   context): out of the flex flow so the title keeps the left edge and the
-   outdoor pair keeps the right, on a phone as much as a monitor. */
+/* The bar's right edge: the assistant button sits snug on the left of the
+   outdoor pair, the two pinned together as one group. */
+.topbar__right {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .topbar__agent {
-  position: absolute;
-  left: 50%;
-  top: 2px;
-  transform: translateX(-50%);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 30px;
   height: 30px;
+  flex: none;
   color: var(--accent);
   background: var(--surface-raised);
   border: 1px solid var(--border);
@@ -2283,7 +2286,8 @@ body {
 
 /* One centred column, chat-app style: on the phone it is simply the screen,
    on a desktop the conversation does not sprawl across 1900px. */
-.assistant__top,
+.assistant__brand,
+.assistant__sub,
 .assistant__scroll,
 .assistant__composer {
   width: 100%;
@@ -2291,29 +2295,66 @@ body {
   margin: 0 auto;
 }
 
-.assistant__top {
+/* The chat wears the dashboard's own masthead, hairline included, so full
+   screen still reads as the same app. */
+.assistant__brand {
+  position: relative;
+  flex: none;
+  padding: 10px 20px 12px;
+}
+
+.assistant__brand h1 {
+  margin: 0;
+  font-size: var(--fs-title);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.assistant__brand::after {
+  content: "";
+  position: absolute;
+  left: 20px;
+  right: 20px;
+  bottom: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    var(--accent) 0,
+    color-mix(in srgb, var(--accent) 40%, var(--border)) 28%,
+    var(--border) 65%,
+    transparent 100%
+  );
+}
+
+/* The subheader row under the brand: the conversation's name and its ✕. One
+   row below the top on purpose - in the home-screen app the brand row shares
+   the screen top with the status bar, where iOS quietly ignores taps. */
+.assistant__sub {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   flex: none;
-  padding: 14px 20px;
+  padding: 10px 20px;
   border-bottom: 1px solid var(--border);
 }
 
-.assistant__top h2 {
-  margin: 0;
-  font-size: var(--fs-lg);
+.assistant__subtitle {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
   font-weight: 600;
-  letter-spacing: -0.01em;
+  color: var(--text-dim);
 }
 
 .assistant__close {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   flex: none;
   color: var(--text);
   background: var(--surface-raised);
@@ -2327,14 +2368,6 @@ body {
 
 .assistant__close:hover {
   border-color: var(--accent);
-}
-
-/* The exit that is always in reach: the header's twin lives in the composer
-   row because in the standalone app the header shares space with the status
-   bar, where iOS quietly ignores taps. Thumb-sized per the 44pt guideline. */
-.assistant__close--composer {
-  width: 40px;
-  height: 40px;
 }
 
 .assistant__scroll {
