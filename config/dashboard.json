@@ -39,6 +39,13 @@
       ]
     },
     {
+      "id": "snibbly",
+      "title": "Snibbly",
+      "type": "service",
+      "service": "llamaSwap",
+      "chat": "http://snibbly.tail0e6756.ts.net:8080/ui/"
+    },
+    {
       "id": "system",
       "title": "System",
       "type": "system",
@@ -114,13 +121,6 @@
       "title": "Photos",
       "type": "service",
       "service": "immich"
-    },
-    {
-      "id": "snibbly",
-      "title": "Snibbly",
-      "type": "service",
-      "service": "llamaSwap",
-      "chat": "http://snibbly.tail0e6756.ts.net:8080/ui/"
     },
     {
       "id": "controls",
