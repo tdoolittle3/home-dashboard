@@ -171,6 +171,8 @@ export interface AppConfig {
   immich: { baseUrl: string; apiKey: string } | null;
   adguard: { baseUrl: string; username: string; password: string } | null;
   llamaSwap: { baseUrl: string; apiKey: string } | null;
+  /** whisper.cpp server for the assistant's mic button (stacks/stt on ladybird). */
+  stt: { baseUrl: string } | null;
   /**
    * Meshtastic-over-MQTT. `channel` is the channel NAME (an uplink topic
    * segment); `channelIndex` is the numeric index downlink sends go out on -
@@ -473,6 +475,7 @@ export function loadConfig(): AppConfig {
   const adguardPass = optional('ADGUARD_PASSWORD');
   const llamaSwapBase = optional('LLAMA_SWAP_BASE_URL');
   const llamaSwapKey = optional('LLAMA_SWAP_API_KEY');
+  const sttBase = optional('STT_BASE_URL');
 
   return {
     port: num('PORT', 8099),
@@ -488,6 +491,7 @@ export function loadConfig(): AppConfig {
         : null,
     llamaSwap:
       llamaSwapBase && llamaSwapKey ? { baseUrl: stripTrailingSlash(llamaSwapBase), apiKey: llamaSwapKey } : null,
+    stt: sttBase ? { baseUrl: stripTrailingSlash(sttBase) } : null,
     mesh: loadMesh(),
     sourceTtlMs: num('SOURCE_TTL_SECONDS', 10) * 1000,
     sourcePushMs: num('SOURCE_PUSH_SECONDS', 15) * 1000,

@@ -2454,3 +2454,26 @@ body {
   outline: none;
   border-color: var(--accent);
 }
+
+/* The mic is a square sibling of Send; while recording it pulses red so a
+   hot microphone is never ambiguous on a wall display. */
+.assistant__mic {
+  min-width: 40px;
+  height: 40px;
+  padding: 0;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.assistant__mic--rec {
+  color: #fff;
+  background: #c0392b;
+  border-color: #c0392b;
+  animation: assistant-rec 1.2s ease-in-out infinite;
+}
+
+@keyframes assistant-rec {
+  50% {
+    opacity: 0.55;
+  }
+}
