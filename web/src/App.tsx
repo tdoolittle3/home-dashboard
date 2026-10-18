@@ -20,10 +20,13 @@ import type { Panel } from './types';
 import { useDashboard } from './useDashboard';
 import { useMediaQuery } from './useMediaQuery';
 
+// Short on purpose: the pill shares one phone-width line with the title, the
+// ✦ and the outdoor pair, and "reconnecting" was what wrapped it. The red
+// pill already says something is wrong; the stream retries on its own.
 const STREAM_LABEL: Record<string, string> = {
   connecting: 'connecting',
   live: 'live',
-  offline: 'reconnecting',
+  offline: 'offline',
 };
 
 export function App() {

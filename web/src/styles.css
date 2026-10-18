@@ -1994,6 +1994,25 @@ body {
     font-size: 23px;
   }
 
+  /* Title, pill, ✦ and the outdoor pair all share one line on a phone;
+     every gap earns its keep. */
+  .topbar {
+    gap: 10px 12px;
+  }
+
+  .topbar__brand {
+    gap: 8px 10px;
+  }
+
+  .topbar__right {
+    gap: 8px;
+  }
+
+  .pill {
+    letter-spacing: 0.03em;
+    padding: 3px 8px 3px 7px;
+  }
+
   .panel__header {
     padding: 14px 16px 0;
   }
