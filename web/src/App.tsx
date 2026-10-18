@@ -151,25 +151,29 @@ export function App() {
             )}
           </div>
         </div>
-        {dashboard.outdoor ? (
-          <span className="topbar__meta topbar__meta--outdoor">
-            {formatState(entities[dashboard.outdoor.temperature])} ·{' '}
-            {formatState(entities[dashboard.outdoor.humidity])}
+        {dashboard.assistant || dashboard.outdoor ? (
+          <span className="topbar__right">
+            {dashboard.assistant ? (
+              <button
+                type="button"
+                className="topbar__agent"
+                onClick={() => setChatOpen(true)}
+                aria-label="Open the assistant"
+              >
+                ✦
+              </button>
+            ) : null}
+            {dashboard.outdoor ? (
+              <span className="topbar__meta topbar__meta--outdoor">
+                {formatState(entities[dashboard.outdoor.temperature])} ·{' '}
+                {formatState(entities[dashboard.outdoor.humidity])}
+              </span>
+            ) : null}
           </span>
-        ) : null}
-        {dashboard.assistant ? (
-          <button
-            type="button"
-            className="topbar__agent"
-            onClick={() => setChatOpen(true)}
-            aria-label="Open the assistant"
-          >
-            ✦
-          </button>
         ) : null}
       </header>
 
-      {chatOpen ? <AssistantModal onClose={() => setChatOpen(false)} /> : null}
+      {chatOpen ? <AssistantModal title={dashboard.title} onClose={() => setChatOpen(false)} /> : null}
 
       {cameraPanels.length > 0 ? <div className="hero">{cameraPanels.map(renderPanel)}</div> : null}
 
