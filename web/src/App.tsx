@@ -1,4 +1,6 @@
+import { useState } from 'react';
 import { AdsbPanel } from './components/AdsbPanel';
+import { AssistantModal } from './components/AssistantModal';
 import { CamerasPanel } from './components/CamerasPanel';
 import { ControlsPanel } from './components/ControlsPanel';
 import { DnsPanel } from './components/DnsPanel';
@@ -30,6 +32,7 @@ export function App() {
   // single stacked column the phone layout was built around stays as it is.
   const desktop = useMediaQuery('(min-width: 901px)');
   const wide = useMediaQuery('(min-width: 1500px)');
+  const [chatOpen, setChatOpen] = useState(false);
 
   if (!snapshot) {
     return (
@@ -154,7 +157,19 @@ export function App() {
             {formatState(entities[dashboard.outdoor.humidity])}
           </span>
         ) : null}
+        {dashboard.assistant ? (
+          <button
+            type="button"
+            className={dashboard.outdoor ? 'topbar__agent' : 'topbar__agent topbar__agent--solo'}
+            onClick={() => setChatOpen(true)}
+            aria-label="Open the assistant"
+          >
+            ✦
+          </button>
+        ) : null}
       </header>
+
+      {chatOpen ? <AssistantModal onClose={() => setChatOpen(false)} /> : null}
 
       {cameraPanels.length > 0 ? <div className="hero">{cameraPanels.map(renderPanel)}</div> : null}
 

@@ -159,6 +159,35 @@ body {
   text-align: right;
 }
 
+/* The assistant button: small enough to share the bar with the outdoor pair
+   on a phone, loud enough in accent to read as "there is an agent here". */
+.topbar__agent {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  margin-left: 12px;
+  flex: none;
+  color: var(--accent);
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  transition: border-color var(--motion-fast) var(--ease);
+}
+
+.topbar__agent:hover {
+  border-color: var(--accent);
+}
+
+/* Without the outdoor pair the button is what holds the right edge. */
+.topbar__agent--solo {
+  margin-left: auto;
+}
+
 .pill {
   display: inline-flex;
   align-items: center;
@@ -2169,4 +2198,156 @@ body {
 
 .mesh__nodes {
   margin-top: 10px;
+}
+
+/* --- assistant chat overlay --- */
+
+.assistant {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  animation: fade var(--motion-fast) var(--ease) both;
+}
+
+/* The same iOS 26/27 standalone fix as .viewer: the layout viewport runs one
+   top safe-area inset short, and which edge loses varies by build - start one
+   inset above the anchor and run one inset taller, and the screen is covered
+   either way. The padding then keeps the header out from under the status bar
+   on the build that anchors below it (the user's). */
+@supports (height: 100lvh) {
+  @media (display-mode: standalone) {
+    .assistant {
+      top: calc(-1 * env(safe-area-inset-top, 0px));
+      bottom: auto;
+      height: calc(100lvh + env(safe-area-inset-top, 0px));
+      padding-top: env(safe-area-inset-top, 0px);
+    }
+  }
+}
+
+/* One centred column, chat-app style: on the phone it is simply the screen,
+   on a desktop the conversation does not sprawl across 1900px. */
+.assistant__top,
+.assistant__scroll,
+.assistant__composer {
+  width: 100%;
+  max-width: 860px;
+  margin: 0 auto;
+}
+
+.assistant__top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex: none;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.assistant__top h2 {
+  margin: 0;
+  font-size: var(--fs-lg);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.assistant__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex: none;
+  color: var(--text);
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  transition: border-color var(--motion-fast) var(--ease);
+}
+
+.assistant__close:hover {
+  border-color: var(--accent);
+}
+
+.assistant__scroll {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px 20px;
+}
+
+.assistant__msg {
+  align-self: flex-start;
+  max-width: min(640px, 88%);
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  border-bottom-left-radius: var(--radius-xs);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-raised);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.5;
+}
+
+.assistant__msg--user {
+  align-self: flex-end;
+  border-radius: var(--radius);
+  border-bottom-right-radius: var(--radius-xs);
+  background: color-mix(in srgb, var(--accent) 16%, var(--surface));
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+}
+
+/* The wait for the first token - which can be a whole model swap-in. */
+.assistant__pulse {
+  color: var(--text-dim);
+  letter-spacing: 2px;
+  animation: assistant-pulse 1.2s var(--ease) infinite;
+}
+
+@keyframes assistant-pulse {
+  0%,
+  100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.assistant__composer {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  flex: none;
+  padding: 12px 20px calc(12px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--border);
+}
+
+.assistant__input {
+  flex: 1;
+  min-height: 40px;
+  max-height: 120px;
+  resize: none;
+  padding: 9px 14px;
+  font: inherit;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.assistant__input:focus {
+  outline: none;
+  border-color: var(--accent);
 }

@@ -126,11 +126,17 @@ export interface OutdoorRefs {
   humidity: string;
 }
 
+/** The topbar assistant button and chat overlay; `model` is the llama-swap model /api/chat talks to. */
+export interface AssistantConfig {
+  model: string;
+}
+
 export interface DashboardConfig {
   title: string;
   panels: Panel[];
   links: ServiceLink[];
   outdoor?: OutdoorRefs;
+  assistant?: AssistantConfig;
 }
 
 export type SourceResult<T> = { ok: true; data: T } | { ok: false; error: string };

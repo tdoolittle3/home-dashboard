@@ -144,11 +144,21 @@ export interface OutdoorRefs {
 
 export const OUTDOOR_ROLES = ['temperature', 'humidity'] as const;
 
+/**
+ * The topbar assistant button and its chat overlay. `model` is the llama-swap
+ * model /api/chat talks to; swapping in a future agent harness is changing
+ * this one value. Needs LLAMA_SWAP_BASE_URL and LLAMA_SWAP_API_KEY to answer.
+ */
+export interface AssistantConfig {
+  model: string;
+}
+
 export interface DashboardConfig {
   title: string;
   panels: Panel[];
   links: ServiceLink[];
   outdoor?: OutdoorRefs;
+  assistant?: AssistantConfig;
 }
 
 export interface AppConfig {
@@ -396,11 +406,17 @@ function loadDashboard(path: string): DashboardConfig {
     }
   }
 
+  // The name lands in a JSON body to llama-swap, so keep it boring.
+  if (parsed.assistant !== undefined && !/^[\w.:-]+$/.test(parsed.assistant.model ?? '')) {
+    throw new Error(`${path}: "assistant" needs a "model" like "8b-abliterated"`);
+  }
+
   return {
     title: parsed.title ?? 'Home',
     panels: parsed.panels,
     links,
     outdoor: parsed.outdoor,
+    assistant: parsed.assistant,
   };
 }
 
