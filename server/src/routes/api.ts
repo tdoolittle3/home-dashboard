@@ -180,6 +180,93 @@ export function registerApiRoutes(
   });
 
   /**
+   * The assistant chat: relays one conversation turn to llama-swap on the
+   * inference box and streams the completion back as the same SSE the browser
+   * would get from llama-swap directly - except the API key stays server-side,
+   * like every other credential here. The model comes from dashboard.json's
+   * "assistant", so pointing the button at a different model (or a future
+   * agent harness) is a config change, not a code change.
+   */
+  const CHAT_ROLES = new Set(['user', 'assistant']);
+  const CHAT_MAX_MESSAGES = 40;
+  const CHAT_MAX_CHARS = 8_000;
+  /** Selecting a cold model makes llama-swap swap it in before the first token; its own ceiling is healthCheckTimeout (minutes, not seconds). */
+  const CHAT_TIMEOUT_MS = 300_000;
+  /** /no_think is Qwen3's soft switch - replies start immediately instead of after a hidden reasoning block. */
+  const CHAT_SYSTEM_PROMPT =
+    'You are the assistant on the ladybird home dashboard. Be concise, direct and helpful. /no_think';
+
+  app.post('/api/chat', async (request, reply) => {
+    const llamaSwap = config.llamaSwap;
+    const assistant = config.dashboard.assistant;
+    if (!llamaSwap || !assistant) {
+      return reply.code(503).send({ error: 'assistant is not configured' });
+    }
+
+    const body = (request.body ?? {}) as { messages?: unknown };
+    const raw = Array.isArray(body.messages) ? body.messages : null;
+    if (!raw || raw.length === 0 || raw.length > CHAT_MAX_MESSAGES) {
+      return reply.code(400).send({ error: `messages must be an array of 1-${CHAT_MAX_MESSAGES}` });
+    }
+    const messages: { role: string; content: string }[] = [];
+    for (const entry of raw) {
+      const message = entry as { role?: unknown; content?: unknown };
+      if (
+        typeof message.role !== 'string' ||
+        !CHAT_ROLES.has(message.role) ||
+        typeof message.content !== 'string' ||
+        message.content.length === 0 ||
+        message.content.length > CHAT_MAX_CHARS
+      ) {
+        return reply
+          .code(400)
+          .send({ error: `each message needs a user/assistant role and 1-${CHAT_MAX_CHARS} chars of content` });
+      }
+      messages.push({ role: message.role, content: message.content });
+    }
+
+    // The disconnect signal lives on the RESPONSE here: on a POST, request.raw
+    // emits 'close' as soon as the consumed body stream is torn down - long
+    // before the client goes anywhere. reply.raw closes when the client does
+    // (or when the reply finishes, when aborting is a no-op).
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), CHAT_TIMEOUT_MS);
+    reply.raw.on('close', () => {
+      clearTimeout(timer);
+      controller.abort();
+    });
+
+    let upstream: Response;
+    try {
+      upstream = await fetch(`${llamaSwap.baseUrl}/v1/chat/completions`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${llamaSwap.apiKey}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: assistant.model,
+          messages: [{ role: 'system', content: CHAT_SYSTEM_PROMPT }, ...messages],
+          stream: true,
+          max_tokens: 1024,
+        }),
+        signal: controller.signal,
+      });
+    } catch (error) {
+      return reply.code(502).send({ error: error instanceof Error ? error.message : String(error) });
+    }
+    if (!upstream.ok || !upstream.body) {
+      const detail = await upstream.text().catch(() => '');
+      return reply
+        .code(502)
+        .send({ error: `llama-swap returned ${upstream.status}${detail ? `: ${detail.slice(0, 300)}` : ''}` });
+    }
+
+    return reply
+      .header('Content-Type', 'text/event-stream')
+      .header('Cache-Control', 'no-store')
+      .header('X-Accel-Buffering', 'no')
+      .send(Readable.fromWeb(upstream.body as unknown as WebReadableStream<Uint8Array>));
+  });
+
+  /**
    * Proxies Frigate stills so the browser needs no route to the camera island
    * and no knowledge of Frigate's unauthenticated port.
    */
