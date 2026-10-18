@@ -287,12 +287,58 @@ body {
   text-align: right;
 }
 
-/* An outbound link sitting in a panel's aside, like the ADS-B full-map link. */
+/* A whole-header fold toggle (the Snibbly panel): status dot + title on the
+   left, summary + chevron on the right, body rendered only while open. */
+.panel__toggle {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 16px 20px;
+  border: none;
+  background: none;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.panel__toggle[aria-expanded='true'] {
+  padding-bottom: 0;
+}
+
+.panel__heading {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-size: var(--fs-lg);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+.panel__chevron {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  margin-left: 10px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg);
+  transition: transform var(--motion-fast) var(--ease);
+}
+
+.panel__chevron--open {
+  transform: rotate(225deg);
+}
+
+/* The fold's way out to the full llama-swap chat UI, under the model rows. */
 .panel__open {
-  margin-left: 12px;
+  display: inline-block;
+  margin-top: 14px;
   color: var(--accent);
+  font-size: var(--fs-sm);
   text-decoration: none;
-  white-space: nowrap;
 }
 
 .panel__open:hover {
@@ -1920,6 +1966,14 @@ body {
 
   .panel__header {
     padding: 14px 16px 0;
+  }
+
+  .panel__toggle {
+    padding: 14px 16px;
+  }
+
+  .panel__toggle[aria-expanded='true'] {
+    padding-bottom: 0;
   }
 
   .panel__body {
