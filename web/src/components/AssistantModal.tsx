@@ -46,9 +46,16 @@ export function AssistantModal({ title, onClose }: AssistantModalProps) {
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [voice, setVoice] = useState<'idle' | 'recording' | 'transcribing'>('idle');
   const abortRef = useRef<AbortController | null>(null);
+  const recorderRef = useRef<MediaRecorder | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
+
+  // getUserMedia only exists in a secure context - https or localhost. Over
+  // plain http the button would be dead weight, so it is not rendered at all;
+  // docs/stt.md in home-automation covers the HTTPS story.
+  const canRecord = typeof MediaRecorder !== 'undefined' && !!navigator.mediaDevices?.getUserMedia;
 
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
@@ -116,8 +123,76 @@ export function AssistantModal({ title, onClose }: AssistantModalProps) {
     if (node) node.scrollTop = node.scrollHeight;
   }, [messages]);
 
-  async function send() {
-    const text = draft.trim();
+  // Closing mid-recording releases the mic along with everything else.
+  useEffect(
+    () => () => {
+      recorderRef.current?.stream.getTracks().forEach((track) => track.stop());
+    },
+    [],
+  );
+
+  /**
+   * Tap to record, tap again to send what was said. The clip goes to /api/stt
+   * (whisper on ladybird, see home-automation's docs/stt.md) and the
+   * transcript is sent as a normal chat turn - it shows up as your message,
+   * so a mishear is visible rather than mysterious.
+   */
+  async function toggleMic() {
+    if (voice === 'recording') {
+      recorderRef.current?.stop();
+      return;
+    }
+    if (voice !== 'idle' || busy) return;
+    setError(null);
+    let stream: MediaStream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch {
+      setError('microphone permission was refused');
+      return;
+    }
+    // Chrome/Android record webm/opus; iPhone Safari only mp4. Whisper's
+    // bundled ffmpeg converts either, so first supported wins.
+    const mimeType = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'].find((type) =>
+      MediaRecorder.isTypeSupported(type),
+    );
+    const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+    const chunks: Blob[] = [];
+    recorder.ondataavailable = (event) => {
+      if (event.data.size > 0) chunks.push(event.data);
+    };
+    recorder.onstop = async () => {
+      stream.getTracks().forEach((track) => track.stop());
+      recorderRef.current = null;
+      setVoice('transcribing');
+      try {
+        const type = recorder.mimeType || mimeType || 'audio/webm';
+        const response = await fetch('/api/stt', {
+          method: 'POST',
+          headers: { 'Content-Type': type },
+          body: new Blob(chunks, { type }),
+        });
+        const result = (await response.json().catch(() => null)) as { text?: string; error?: string } | null;
+        if (!response.ok) throw new Error(result?.error ?? `the server returned ${response.status}`);
+        const text = result?.text?.trim() ?? '';
+        if (!text) {
+          setError('heard nothing - try again closer to the mic');
+        } else {
+          await send(text);
+        }
+      } catch (err) {
+        setError(err instanceof Error ? err.message : String(err));
+      } finally {
+        setVoice('idle');
+      }
+    };
+    recorderRef.current = recorder;
+    recorder.start();
+    setVoice('recording');
+  }
+
+  async function send(spoken?: string) {
+    const text = (spoken ?? draft).trim();
     if (!text || busy) return;
     setDraft('');
     setError(null);
@@ -262,12 +337,23 @@ export function AssistantModal({ title, onClose }: AssistantModalProps) {
           void send();
         }}
       >
+        {canRecord ? (
+          <button
+            type="button"
+            className={`toggle assistant__mic${voice === 'recording' ? ' assistant__mic--rec' : ''}`}
+            onClick={() => void toggleMic()}
+            disabled={busy || voice === 'transcribing'}
+            aria-label={voice === 'recording' ? 'Stop recording and send' : 'Speak instead of typing'}
+          >
+            {voice === 'recording' ? '■' : voice === 'transcribing' ? '…' : '🎤'}
+          </button>
+        ) : null}
         <textarea
           ref={inputRef}
           className="assistant__input"
           rows={1}
           value={draft}
-          placeholder="Message…"
+          placeholder={voice === 'recording' ? 'Listening…' : 'Message…'}
           onChange={(event) => setDraft(event.target.value)}
           onKeyDown={onKeyDown}
         />

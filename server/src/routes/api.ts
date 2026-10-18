@@ -267,6 +267,66 @@ export function registerApiRoutes(
   });
 
   /**
+   * The mic button's other half: the browser records a clip (webm on Chrome,
+   * mp4 on iPhone - whisper's bundled ffmpeg takes either) and posts it here
+   * raw; this relays it to whisper.cpp on the LAN and answers with the
+   * transcript. A spoken command runs seconds, so the cap is generous.
+   */
+  const STT_MAX_BYTES = 15 * 1024 * 1024;
+  const STT_TIMEOUT_MS = 60_000;
+  const STT_EXT: Record<string, string> = {
+    'audio/webm': 'webm',
+    'audio/mp4': 'mp4',
+    'audio/mpeg': 'mp3',
+    'audio/ogg': 'ogg',
+    'audio/wav': 'wav',
+  };
+
+  app.addContentTypeParser(/^audio\//, { parseAs: 'buffer', bodyLimit: STT_MAX_BYTES }, (_request, body, done) =>
+    done(null, body),
+  );
+
+  app.post('/api/stt', async (request, reply) => {
+    const stt = config.stt;
+    if (!stt) {
+      return reply.code(503).send({ error: 'STT_BASE_URL is not configured' });
+    }
+    const audio = request.body;
+    if (!Buffer.isBuffer(audio) || audio.length === 0) {
+      return reply.code(400).send({ error: 'post the recorded audio as the raw body with its audio/* content type' });
+    }
+
+    const mime = (request.headers['content-type'] ?? '').split(';')[0]?.trim() ?? '';
+    const form = new FormData();
+    form.append('file', new Blob([audio], { type: mime }), `clip.${STT_EXT[mime] ?? 'webm'}`);
+    form.append('response_format', 'json');
+
+    // fetchWithTimeout only carries headers; this needs a method and a body.
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), STT_TIMEOUT_MS);
+    try {
+      const upstream = await fetch(`${stt.baseUrl}/inference`, {
+        method: 'POST',
+        body: form,
+        signal: controller.signal,
+      });
+      if (!upstream.ok) {
+        const detail = await upstream.text().catch(() => '');
+        return reply
+          .code(502)
+          .send({ error: `whisper returned ${upstream.status}${detail ? `: ${detail.slice(0, 200)}` : ''}` });
+      }
+      const result = (await upstream.json()) as { text?: unknown };
+      const text = typeof result.text === 'string' ? result.text.trim() : '';
+      return reply.header('Cache-Control', 'no-store').send({ text });
+    } catch (error) {
+      return reply.code(502).send({ error: error instanceof Error ? error.message : String(error) });
+    } finally {
+      clearTimeout(timer);
+    }
+  });
+
+  /**
    * Proxies Frigate stills so the browser needs no route to the camera island
    * and no knowledge of Frigate's unauthenticated port.
    */
