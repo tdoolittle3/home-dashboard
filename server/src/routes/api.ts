@@ -192,9 +192,9 @@ export function registerApiRoutes(
   const CHAT_MAX_CHARS = 8_000;
   /** Selecting a cold model makes llama-swap swap it in before the first token; its own ceiling is healthCheckTimeout (minutes, not seconds). */
   const CHAT_TIMEOUT_MS = 300_000;
-  /** /no_think is Qwen3's soft switch - replies start immediately instead of after a hidden reasoning block. */
-  const CHAT_SYSTEM_PROMPT =
-    'You are the assistant on the ladybird home dashboard. Be concise, direct and helpful. /no_think';
+  // No /no_think here: the abliterated model ignores the soft switch anyway,
+  // and the modal shows the reasoning live then drops it when the answer starts.
+  const CHAT_SYSTEM_PROMPT = 'You are the assistant on the ladybird home dashboard. Be concise, direct and helpful.';
 
   app.post('/api/chat', async (request, reply) => {
     const llamaSwap = config.llamaSwap;

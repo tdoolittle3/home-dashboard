@@ -160,7 +160,7 @@ export function App() {
         {dashboard.assistant ? (
           <button
             type="button"
-            className={dashboard.outdoor ? 'topbar__agent' : 'topbar__agent topbar__agent--solo'}
+            className="topbar__agent"
             onClick={() => setChatOpen(true)}
             aria-label="Open the assistant"
           >

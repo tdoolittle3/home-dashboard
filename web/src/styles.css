@@ -159,16 +159,19 @@ body {
   text-align: right;
 }
 
-/* The assistant button: small enough to share the bar with the outdoor pair
-   on a phone, loud enough in accent to read as "there is an agent here". */
+/* The assistant button, dead centre of the bar (the .topbar is the positioning
+   context): out of the flex flow so the title keeps the left edge and the
+   outdoor pair keeps the right, on a phone as much as a monitor. */
 .topbar__agent {
+  position: absolute;
+  left: 50%;
+  top: 2px;
+  transform: translateX(-50%);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   width: 30px;
   height: 30px;
-  margin-left: 12px;
-  flex: none;
   color: var(--accent);
   background: var(--surface-raised);
   border: 1px solid var(--border);
@@ -181,11 +184,6 @@ body {
 
 .topbar__agent:hover {
   border-color: var(--accent);
-}
-
-/* Without the outdoor pair the button is what holds the right edge. */
-.topbar__agent--solo {
-  margin-left: auto;
 }
 
 .pill {
@@ -2266,17 +2264,18 @@ body {
   animation: fade var(--motion-fast) var(--ease) both;
 }
 
-/* The same iOS 26/27 standalone fix as .viewer: the layout viewport runs one
-   top safe-area inset short, and which edge loses varies by build - start one
-   inset above the anchor and run one inset taller, and the screen is covered
-   either way. The padding then keeps the header out from under the status bar
-   on the build that anchors below it (the user's). */
+/* iOS 26/27 standalone: the fixed layer anchors one top inset below the
+   screen top, so shift up by that inset and run one large-viewport height -
+   which spans the real screen - from there. Unlike .viewer this does NOT also
+   overhang the bottom: the composer is pinned to the container's bottom edge,
+   and the viewer's extra inset of height would push it below the glass. The
+   padding keeps the header out from under the status bar. */
 @supports (height: 100lvh) {
   @media (display-mode: standalone) {
     .assistant {
       top: calc(-1 * env(safe-area-inset-top, 0px));
       bottom: auto;
-      height: calc(100lvh + env(safe-area-inset-top, 0px));
+      height: 100lvh;
       padding-top: env(safe-area-inset-top, 0px);
     }
   }
@@ -2362,6 +2361,13 @@ body {
   border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
 }
 
+/* The model reasoning out loud, shown only until the answer's first token. */
+.assistant__thinking {
+  color: var(--text-dim);
+  font-style: italic;
+  font-size: var(--fs-sm);
+}
+
 /* The wait for the first token - which can be a whole model swap-in. */
 .assistant__pulse {
   color: var(--text-dim);
@@ -2395,6 +2401,8 @@ body {
   resize: none;
   padding: 9px 14px;
   font: inherit;
+  /* Never below 16px: iOS auto-zooms the whole page on focusing anything smaller. */
+  font-size: 16px;
   color: var(--text);
   background: var(--surface);
   border: 1px solid var(--border);
