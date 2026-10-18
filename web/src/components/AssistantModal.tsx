@@ -7,11 +7,27 @@ interface AssistantModalProps {
 interface ChatMessage {
   role: 'user' | 'assistant';
   content: string;
+  /** Reasoning streamed via a separate delta field, when the template parses it out. */
+  thinking?: string;
 }
 
-/** One OpenAI-style streaming chunk, trimmed to the field the modal reads. */
+/** One OpenAI-style streaming chunk, trimmed to the fields the modal reads. */
 interface ChatChunk {
-  choices?: { delta?: { content?: string } }[];
+  choices?: { delta?: { content?: string; reasoning_content?: string } }[];
+}
+
+/**
+ * Qwen3 reasons out loud before answering, as inline <think> tags in the
+ * content (or the reasoning_content field, handled above). The reasoning is
+ * worth watching while it streams, so it is split out rather than stripped:
+ * the modal shows it dimmed until the first answer token, then it goes away.
+ */
+function splitThink(raw: string): { thinking: string; answer: string } {
+  const start = raw.indexOf('<think>');
+  if (start === -1) return { thinking: '', answer: raw };
+  const end = raw.indexOf('</think>');
+  if (end === -1) return { thinking: raw.slice(start + 7), answer: raw.slice(0, start) };
+  return { thinking: raw.slice(start + 7, end), answer: raw.slice(0, start) + raw.slice(end + 8) };
 }
 
 /**
@@ -119,17 +135,27 @@ export function AssistantModal({ onClose }: AssistantModalProps) {
           if (!line.startsWith('data: ')) continue;
           const data = line.slice(6).trim();
           if (!data || data === '[DONE]') continue;
-          let delta = '';
+          let content = '';
+          let reasoning = '';
           try {
-            delta = (JSON.parse(data) as ChatChunk).choices?.[0]?.delta?.content ?? '';
+            const delta = (JSON.parse(data) as ChatChunk).choices?.[0]?.delta;
+            content = delta?.content ?? '';
+            reasoning = delta?.reasoning_content ?? '';
           } catch {
             // A keep-alive or a chunk split mid-line; the rest arrives next read.
           }
-          if (delta) {
+          if (content || reasoning) {
             setMessages((current) => {
               const last = current[current.length - 1];
               if (!last || last.role !== 'assistant') return current;
-              return [...current.slice(0, -1), { role: 'assistant', content: last.content + delta }];
+              return [
+                ...current.slice(0, -1),
+                {
+                  role: 'assistant',
+                  content: last.content + content,
+                  thinking: (last.thinking ?? '') + reasoning,
+                },
+              ];
             });
           }
         }
@@ -169,15 +195,33 @@ export function AssistantModal({ onClose }: AssistantModalProps) {
         {messages.length === 0 ? (
           <p className="empty">Runs on Snibbly, right here on the LAN. A cold model takes a moment to load.</p>
         ) : null}
-        {messages.map((message, index) => (
-          <div
-            key={index}
-            className={message.role === 'user' ? 'assistant__msg assistant__msg--user' : 'assistant__msg'}
-          >
-            {message.content ||
-              (busy && index === messages.length - 1 ? <span className="assistant__pulse">· · ·</span> : '')}
-          </div>
-        ))}
+        {messages.map((message, index) => {
+          if (message.role === 'user') {
+            return (
+              <div key={index} className="assistant__msg assistant__msg--user">
+                {message.content}
+              </div>
+            );
+          }
+          // The answer replaces the reasoning the moment its first token lands.
+          const { thinking: inlineThinking, answer } = splitThink(message.content);
+          const answerText = answer.replace(/^\s+/, '');
+          const thinkingText = `${message.thinking ?? ''}${inlineThinking}`.trim();
+          const streaming = busy && index === messages.length - 1;
+          return (
+            <div key={index} className="assistant__msg">
+              {answerText ? (
+                answerText
+              ) : thinkingText && streaming ? (
+                <span className="assistant__thinking">{thinkingText}</span>
+              ) : streaming ? (
+                <span className="assistant__pulse">· · ·</span>
+              ) : (
+                ''
+              )}
+            </div>
+          );
+        })}
         {error ? <p className="empty text-alert">{error}</p> : null}
       </div>
       <form
