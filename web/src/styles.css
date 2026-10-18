@@ -2329,6 +2329,14 @@ body {
   border-color: var(--accent);
 }
 
+/* The exit that is always in reach: the header's twin lives in the composer
+   row because in the standalone app the header shares space with the status
+   bar, where iOS quietly ignores taps. Thumb-sized per the 44pt guideline. */
+.assistant__close--composer {
+  width: 40px;
+  height: 40px;
+}
+
 .assistant__scroll {
   flex: 1;
   overflow-y: auto;

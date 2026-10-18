@@ -87,6 +87,21 @@ export function AssistantModal({ onClose }: AssistantModalProps) {
     };
   }, []);
 
+  // In the home-screen app there is no browser chrome and the header sits in
+  // the status-bar zone where taps are unreliable, so the OS back gesture
+  // (left-edge swipe) must work as the way out: opening pushes one history
+  // entry and popping it closes the chat. Closing any other way consumes the
+  // entry again so the NEXT back gesture does not navigate the dashboard away.
+  useEffect(() => {
+    window.history.pushState({ assistant: true }, '');
+    const onPop = () => onCloseRef.current();
+    window.addEventListener('popstate', onPop);
+    return () => {
+      window.removeEventListener('popstate', onPop);
+      if ((window.history.state as { assistant?: boolean } | null)?.assistant) window.history.back();
+    };
+  }, []);
+
   // Closing mid-reply aborts the fetch, which the server propagates upstream.
   useEffect(() => () => abortRef.current?.abort(), []);
 
@@ -231,6 +246,14 @@ export function AssistantModal({ onClose }: AssistantModalProps) {
           void send();
         }}
       >
+        <button
+          type="button"
+          className="assistant__close assistant__close--composer"
+          onClick={onClose}
+          aria-label="Close the chat"
+        >
+          ✕
+        </button>
         <textarea
           ref={inputRef}
           className="assistant__input"
