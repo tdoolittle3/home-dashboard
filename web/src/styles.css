@@ -159,36 +159,6 @@ body {
   text-align: right;
 }
 
-/* The bar's right edge: the assistant button sits snug on the left of the
-   outdoor pair, the two pinned together as one group. */
-.topbar__right {
-  margin-left: auto;
-  display: inline-flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.topbar__agent {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  flex: none;
-  color: var(--accent);
-  background: var(--surface-raised);
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  font-size: 14px;
-  line-height: 1;
-  cursor: pointer;
-  transition: border-color var(--motion-fast) var(--ease);
-}
-
-.topbar__agent:hover {
-  border-color: var(--accent);
-}
-
 .pill {
   display: inline-flex;
   align-items: center;
@@ -1959,7 +1929,10 @@ body {
   .ups--critical .ups__gauge-fill,
   .health--outage .health__title,
   .badge--emergency,
-  .sense--alert .sense__dot {
+  .sense--alert .sense__dot,
+  .micfab--rec,
+  .voice__orb--rec::before,
+  .voice__orb--rec::after {
     animation: none;
   }
 }
@@ -2455,25 +2428,152 @@ body {
   border-color: var(--accent);
 }
 
-/* The mic is a square sibling of Send; while recording it pulses red so a
-   hot microphone is never ambiguous on a wall display. */
-.assistant__mic {
-  min-width: 40px;
-  height: 40px;
-  padding: 0;
-  font-size: 18px;
-  line-height: 1;
+/* --- floating mic --- */
+
+/* The assistant's front door: a circle pinned to the bottom-right, clear of
+   the iOS home indicator, above everything including the chat overlay (60) so
+   the same button keeps working as the follow-up mic while the chat is open. */
+.micfab {
+  position: fixed;
+  right: 20px;
+  bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  z-index: 70;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 999px;
+  color: var(--accent);
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-raised);
+  cursor: pointer;
+  /* The hold gesture owns the touch: no scroll-steal, no iOS callout. */
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: border-color var(--motion-fast) var(--ease);
 }
 
-.assistant__mic--rec {
+.micfab:hover {
+  border-color: var(--accent);
+}
+
+/* The chat's composer lives in the same corner; climb above its Send button. */
+.micfab--raised {
+  bottom: calc(84px + env(safe-area-inset-bottom, 0px));
+}
+
+/* While recording it burns red so a hot microphone is never ambiguous. */
+.micfab--rec {
   color: #fff;
   background: #c0392b;
   border-color: #c0392b;
-  animation: assistant-rec 1.2s ease-in-out infinite;
+  animation: micfab-rec 1.2s ease-in-out infinite;
 }
 
-@keyframes assistant-rec {
+@keyframes micfab-rec {
   50% {
     opacity: 0.55;
   }
+}
+
+/* --- hold-to-talk overlay --- */
+
+/* The listening layer: above the chat (60), below the mic itself (70) so the
+   finger holding the button stays on the button. */
+.voice {
+  position: fixed;
+  inset: 0;
+  z-index: 65;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 28px;
+  padding: 24px;
+  background: color-mix(in srgb, var(--bg) 85%, transparent);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  animation: fade var(--motion-fast) var(--ease) both;
+}
+
+/* Same iOS 26/27 standalone correction as .viewer: the fixed layer anchors one
+   top inset below the screen top, so overhang both ends. */
+@supports (height: 100lvh) {
+  @media (display-mode: standalone) {
+    .voice {
+      top: calc(-1 * env(safe-area-inset-top, 0px));
+      bottom: auto;
+      height: calc(100lvh + env(safe-area-inset-top, 0px));
+    }
+  }
+}
+
+/* The mic orb; while recording two rings swell out of it and fade, offset half
+   a cycle so one is always mid-flight. Transcribing stops the rings and dims
+   the orb - the listening is over, the reading is happening. */
+.voice__orb {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 18%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--border));
+  opacity: 0.7;
+}
+
+.voice__orb svg {
+  width: 34px;
+  height: 34px;
+}
+
+.voice__orb--rec {
+  opacity: 1;
+}
+
+.voice__orb--rec::before,
+.voice__orb--rec::after {
+  content: "";
+  position: absolute;
+  inset: -1px;
+  border-radius: 50%;
+  border: 2px solid var(--accent);
+  animation: voice-ring 1.8s var(--ease) infinite;
+}
+
+.voice__orb--rec::after {
+  animation-delay: 0.9s;
+}
+
+@keyframes voice-ring {
+  from {
+    transform: scale(1);
+    opacity: 0.65;
+  }
+  to {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+
+/* The words as whisper hears them - a second or two behind the voice and
+   occasionally rewriting themselves; that is the batch model re-reading the
+   growing clip, not an error. */
+.voice__text {
+  margin: 0;
+  max-width: min(640px, 100%);
+  text-align: center;
+  font-size: var(--fs-lg);
+  line-height: 1.5;
+  color: var(--text);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }

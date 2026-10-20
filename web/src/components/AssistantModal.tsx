@@ -1,28 +1,22 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import type { ChatMessage } from '../useAssistantChat';
 
 interface AssistantModalProps {
   /** The dashboard title, so the chat's brand bar reads like the page it covers. */
   title: string;
+  messages: ChatMessage[];
+  busy: boolean;
+  error: string | null;
+  onSend: (text: string) => void;
   onClose: () => void;
-}
-
-interface ChatMessage {
-  role: 'user' | 'assistant';
-  content: string;
-  /** Reasoning streamed via a separate delta field, when the template parses it out. */
-  thinking?: string;
-}
-
-/** One OpenAI-style streaming chunk, trimmed to the fields the modal reads. */
-interface ChatChunk {
-  choices?: { delta?: { content?: string; reasoning_content?: string } }[];
 }
 
 /**
  * Qwen3 reasons out loud before answering, as inline <think> tags in the
- * content (or the reasoning_content field, handled above). The reasoning is
- * worth watching while it streams, so it is split out rather than stripped:
- * the modal shows it dimmed until the first answer token, then it goes away.
+ * content (or the reasoning_content field, which arrives already split). The
+ * reasoning is worth watching while it streams, so it is split out rather than
+ * stripped: the modal shows it dimmed until the first answer token, then it
+ * goes away.
  */
 function splitThink(raw: string): { thinking: string; answer: string } {
   const start = raw.indexOf('<think>');
@@ -33,29 +27,16 @@ function splitThink(raw: string): { thinking: string; answer: string } {
 }
 
 /**
- * The full-screen chat overlay behind the topbar's agent button. History lives
- * here and only here - closing the modal is a fresh conversation, which suits
- * a wall dashboard better than a transcript that quietly grows forever. Each
- * send posts the whole history to /api/chat (the server adds the system prompt
- * and the llama-swap key) and appends streamed deltas to a placeholder
- * assistant message, so tokens show up as the model produces them - including
- * the long first-token pause while llama-swap swaps a cold model in.
+ * The full-screen chat overlay behind the floating mic. The conversation
+ * itself lives in useAssistantChat up in App - the mic speaks into it from
+ * outside this overlay - and App resets it on close, so closing is still a
+ * fresh conversation, which suits a wall dashboard better than a transcript
+ * that quietly grows forever.
  */
-export function AssistantModal({ title, onClose }: AssistantModalProps) {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+export function AssistantModal({ title, messages, busy, error, onSend, onClose }: AssistantModalProps) {
   const [draft, setDraft] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [voice, setVoice] = useState<'idle' | 'recording' | 'transcribing'>('idle');
-  const abortRef = useRef<AbortController | null>(null);
-  const recorderRef = useRef<MediaRecorder | null>(null);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
-
-  // getUserMedia only exists in a secure context - https or localhost. Over
-  // plain http the button would be dead weight, so it is not rendered at all;
-  // docs/stt.md in home-automation covers the HTTPS story.
-  const canRecord = typeof MediaRecorder !== 'undefined' && !!navigator.mediaDevices?.getUserMedia;
 
   const onCloseRef = useRef(onClose);
   onCloseRef.current = onClose;
@@ -111,9 +92,6 @@ export function AssistantModal({ title, onClose }: AssistantModalProps) {
     };
   }, []);
 
-  // Closing mid-reply aborts the fetch, which the server propagates upstream.
-  useEffect(() => () => abortRef.current?.abort(), []);
-
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
@@ -123,155 +101,17 @@ export function AssistantModal({ title, onClose }: AssistantModalProps) {
     if (node) node.scrollTop = node.scrollHeight;
   }, [messages]);
 
-  // Closing mid-recording releases the mic along with everything else.
-  useEffect(
-    () => () => {
-      recorderRef.current?.stream.getTracks().forEach((track) => track.stop());
-    },
-    [],
-  );
-
-  /**
-   * Tap to record, tap again to send what was said. The clip goes to /api/stt
-   * (whisper on ladybird, see home-automation's docs/stt.md) and the
-   * transcript is sent as a normal chat turn - it shows up as your message,
-   * so a mishear is visible rather than mysterious.
-   */
-  async function toggleMic() {
-    if (voice === 'recording') {
-      recorderRef.current?.stop();
-      return;
-    }
-    if (voice !== 'idle' || busy) return;
-    setError(null);
-    let stream: MediaStream;
-    try {
-      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    } catch {
-      setError('microphone permission was refused');
-      return;
-    }
-    // Chrome/Android record webm/opus; iPhone Safari only mp4. Whisper's
-    // bundled ffmpeg converts either, so first supported wins.
-    const mimeType = ['audio/webm;codecs=opus', 'audio/webm', 'audio/mp4'].find((type) =>
-      MediaRecorder.isTypeSupported(type),
-    );
-    const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
-    const chunks: Blob[] = [];
-    recorder.ondataavailable = (event) => {
-      if (event.data.size > 0) chunks.push(event.data);
-    };
-    recorder.onstop = async () => {
-      stream.getTracks().forEach((track) => track.stop());
-      recorderRef.current = null;
-      setVoice('transcribing');
-      try {
-        const type = recorder.mimeType || mimeType || 'audio/webm';
-        const response = await fetch('/api/stt', {
-          method: 'POST',
-          headers: { 'Content-Type': type },
-          body: new Blob(chunks, { type }),
-        });
-        const result = (await response.json().catch(() => null)) as { text?: string; error?: string } | null;
-        if (!response.ok) throw new Error(result?.error ?? `the server returned ${response.status}`);
-        const text = result?.text?.trim() ?? '';
-        if (!text) {
-          setError('heard nothing - try again closer to the mic');
-        } else {
-          await send(text);
-        }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : String(err));
-      } finally {
-        setVoice('idle');
-      }
-    };
-    recorderRef.current = recorder;
-    recorder.start();
-    setVoice('recording');
-  }
-
-  async function send(spoken?: string) {
-    const text = (spoken ?? draft).trim();
+  function submit() {
+    const text = draft.trim();
     if (!text || busy) return;
     setDraft('');
-    setError(null);
-    const history: ChatMessage[] = [...messages, { role: 'user', content: text }];
-    setMessages([...history, { role: 'assistant', content: '' }]);
-    setBusy(true);
-
-    const controller = new AbortController();
-    abortRef.current = controller;
-    try {
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ messages: history }),
-        signal: controller.signal,
-      });
-      if (!response.ok || !response.body) {
-        const detail = (await response.json().catch(() => null)) as { error?: string } | null;
-        throw new Error(detail?.error ?? `the server returned ${response.status}`);
-      }
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-      for (;;) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() ?? '';
-        for (const line of lines) {
-          if (!line.startsWith('data: ')) continue;
-          const data = line.slice(6).trim();
-          if (!data || data === '[DONE]') continue;
-          let content = '';
-          let reasoning = '';
-          try {
-            const delta = (JSON.parse(data) as ChatChunk).choices?.[0]?.delta;
-            content = delta?.content ?? '';
-            reasoning = delta?.reasoning_content ?? '';
-          } catch {
-            // A keep-alive or a chunk split mid-line; the rest arrives next read.
-          }
-          if (content || reasoning) {
-            setMessages((current) => {
-              const last = current[current.length - 1];
-              if (!last || last.role !== 'assistant') return current;
-              return [
-                ...current.slice(0, -1),
-                {
-                  role: 'assistant',
-                  content: last.content + content,
-                  thinking: (last.thinking ?? '') + reasoning,
-                },
-              ];
-            });
-          }
-        }
-      }
-    } catch (err) {
-      if (!controller.signal.aborted) {
-        setError(err instanceof Error ? err.message : String(err));
-        // Drop the placeholder if nothing ever arrived, so a failed turn
-        // leaves the user's message as the last thing said.
-        setMessages((current) => {
-          const last = current[current.length - 1];
-          return last && last.role === 'assistant' && last.content === '' ? current.slice(0, -1) : current;
-        });
-      }
-    } finally {
-      setBusy(false);
-      abortRef.current = null;
-    }
+    onSend(text);
   }
 
   const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === 'Enter' && !event.shiftKey) {
       event.preventDefault();
-      void send();
+      submit();
     }
   };
 
@@ -334,26 +174,15 @@ export function AssistantModal({ title, onClose }: AssistantModalProps) {
         className="assistant__composer"
         onSubmit={(event) => {
           event.preventDefault();
-          void send();
+          submit();
         }}
       >
-        {canRecord ? (
-          <button
-            type="button"
-            className={`toggle assistant__mic${voice === 'recording' ? ' assistant__mic--rec' : ''}`}
-            onClick={() => void toggleMic()}
-            disabled={busy || voice === 'transcribing'}
-            aria-label={voice === 'recording' ? 'Stop recording and send' : 'Speak instead of typing'}
-          >
-            {voice === 'recording' ? '■' : voice === 'transcribing' ? '…' : '🎤'}
-          </button>
-        ) : null}
         <textarea
           ref={inputRef}
           className="assistant__input"
           rows={1}
           value={draft}
-          placeholder={voice === 'recording' ? 'Listening…' : 'Message…'}
+          placeholder="Message…"
           onChange={(event) => setDraft(event.target.value)}
           onKeyDown={onKeyDown}
         />
