@@ -2566,10 +2566,17 @@ body {
 
 /* The words as whisper hears them - a second or two behind the voice and
    occasionally rewriting themselves; that is the batch model re-reading the
-   growing clip, not an error. */
+   growing clip, not an error. A flex box bottom-anchors the text so long
+   dictation (or a fast-pass decoder stutter) clips at the TOP: the newest
+   words stay in view. */
 .voice__text {
   margin: 0;
   max-width: min(640px, 100%);
+  max-height: 6em;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
   text-align: center;
   font-size: var(--fs-lg);
   line-height: 1.5;

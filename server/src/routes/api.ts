@@ -286,7 +286,7 @@ export function registerApiRoutes(
     done(null, body),
   );
 
-  app.post('/api/stt', async (request, reply) => {
+  app.post<{ Querystring: { seconds?: string } }>('/api/stt', async (request, reply) => {
     const stt = config.stt;
     if (!stt) {
       return reply.code(503).send({ error: 'STT_BASE_URL is not configured' });
@@ -300,6 +300,19 @@ export function registerApiRoutes(
     const form = new FormData();
     form.append('file', new Blob([audio], { type: mime }), `clip.${STT_EXT[mime] ?? 'webm'}`);
     form.append('response_format', 'json');
+
+    // The mic overlay's interim passes say how long the still-growing clip is.
+    // whisper pads everything to a 30s encoder window, so a 1s clip costs as
+    // much as a 30s one (~2.4s on the 6 ladybird threads); fitting the window
+    // to the clip (50 ctx units per second, plus margin) brings a pass under
+    // a second. Fallback retries are disabled too - on mostly-silent partials
+    // they burn seconds hallucinating. The final pass sends no `seconds` and
+    // keeps whisper's full-quality defaults.
+    const seconds = Number(request.query.seconds);
+    if (Number.isFinite(seconds) && seconds > 0 && seconds < 30) {
+      form.append('audio_ctx', String(Math.min(1500, Math.round(seconds * 50) + 100)));
+      form.append('temperature_inc', '0');
+    }
 
     // fetchWithTimeout only carries headers; this needs a method and a body.
     const controller = new AbortController();
