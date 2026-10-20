@@ -8,6 +8,7 @@ import { EntitiesPanel } from './components/EntitiesPanel';
 import { InferencePanel } from './components/InferencePanel';
 import { Masonry } from './components/Masonry';
 import { MediaPanel } from './components/MediaPanel';
+import { MicFab } from './components/MicFab';
 import { MeshPanel } from './components/MeshPanel';
 import { PhotosPanel } from './components/PhotosPanel';
 import { ServicesPanel } from './components/ServicesPanel';
@@ -17,6 +18,7 @@ import { UpsPanel } from './components/UpsPanel';
 import { UptimePanel } from './components/UptimePanel';
 import { formatRelative, formatState } from './format';
 import type { Panel } from './types';
+import { useAssistantChat } from './useAssistantChat';
 import { useDashboard } from './useDashboard';
 import { useMediaQuery } from './useMediaQuery';
 
@@ -33,6 +35,7 @@ export function App() {
   const desktop = useMediaQuery('(min-width: 901px)');
   const wide = useMediaQuery('(min-width: 1500px)');
   const [chatOpen, setChatOpen] = useState(false);
+  const chat = useAssistantChat();
 
   if (!snapshot) {
     return (
@@ -151,29 +154,39 @@ export function App() {
             )}
           </div>
         </div>
-        {dashboard.assistant || dashboard.outdoor ? (
-          <span className="topbar__right">
-            {dashboard.assistant ? (
-              <button
-                type="button"
-                className="topbar__agent"
-                onClick={() => setChatOpen(true)}
-                aria-label="Open the assistant"
-              >
-                ✦
-              </button>
-            ) : null}
-            {dashboard.outdoor ? (
-              <span className="topbar__meta topbar__meta--outdoor">
-                {formatState(entities[dashboard.outdoor.temperature])} ·{' '}
-                {formatState(entities[dashboard.outdoor.humidity])}
-              </span>
-            ) : null}
+        {dashboard.outdoor ? (
+          <span className="topbar__meta topbar__meta--outdoor">
+            {formatState(entities[dashboard.outdoor.temperature])} ·{' '}
+            {formatState(entities[dashboard.outdoor.humidity])}
           </span>
         ) : null}
       </header>
 
-      {chatOpen ? <AssistantModal title={dashboard.title} onClose={() => setChatOpen(false)} /> : null}
+      {chatOpen ? (
+        <AssistantModal
+          title={dashboard.title}
+          messages={chat.messages}
+          busy={chat.busy}
+          error={chat.error}
+          onSend={(text) => void chat.send(text)}
+          onClose={() => {
+            setChatOpen(false);
+            chat.reset();
+          }}
+        />
+      ) : null}
+
+      {dashboard.assistant ? (
+        <MicFab
+          disabled={chat.busy}
+          raised={chatOpen}
+          onTap={() => setChatOpen(true)}
+          onTranscript={(text) => {
+            void chat.send(text);
+            setChatOpen(true);
+          }}
+        />
+      ) : null}
 
       {cameraPanels.length > 0 ? <div className="hero">{cameraPanels.map(renderPanel)}</div> : null}
 
