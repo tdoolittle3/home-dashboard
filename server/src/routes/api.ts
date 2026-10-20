@@ -305,13 +305,14 @@ export function registerApiRoutes(
     // whisper pads everything to a 30s encoder window, so a 1s clip costs as
     // much as a 30s one (~2.4s on the 6 ladybird threads); fitting the window
     // to the clip (50 ctx units per second, plus margin) brings a pass under
-    // a second. Fallback retries are disabled too - on mostly-silent partials
-    // they burn seconds hallucinating. The final pass sends no `seconds` and
-    // keeps whisper's full-quality defaults.
+    // a second. Fallback retries stay ON: partials always end mid-word, and
+    // without the retry a bad greedy decode shows up as stutter loops and
+    // word salad on the overlay - the retry only costs time on exactly those
+    // passes, measured at most ~1s with the fitted window. The final pass
+    // sends no `seconds` and keeps whisper's full-quality defaults.
     const seconds = Number(request.query.seconds);
     if (Number.isFinite(seconds) && seconds > 0 && seconds < 30) {
       form.append('audio_ctx', String(Math.min(1500, Math.round(seconds * 50) + 100)));
-      form.append('temperature_inc', '0');
     }
 
     // fetchWithTimeout only carries headers; this needs a method and a body.
