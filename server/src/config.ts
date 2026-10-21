@@ -78,10 +78,14 @@ export type Panel =
       service: ServiceName;
       /**
        * Browser-facing URL rendered as the panel's "Open chat" link - the
-       * llamaSwap panel's way into its web UI. Like `links[].url`, this is what
-       * the browser opens, so it is the Tailscale FQDN, never a LAN IP.
+       * llamaSwap panel's way into llama.cpp's chat UI (the /upstream/<model>/
+       * route). Like `links[].url`, this is what the browser opens, so it is
+       * the Tailscale FQDN, never a LAN IP. loadConfig embeds the llama-swap
+       * API key as URL userinfo so the browser's basic-auth prompt never shows.
        */
       chat?: string;
+      /** Browser-facing URL of llama-swap's own /ui/ dashboard; key embedded like `chat`. */
+      dashboard?: string;
     }
   | {
       id: string;
@@ -218,6 +222,20 @@ function num(name: string, fallback: number): number {
 
 function stripTrailingSlash(url: string): string {
   return url.replace(/\/+$/, '');
+}
+
+/**
+ * llama-swap gates its web pages with HTTP Basic - any username, the API key
+ * as the password (query params and bare userinfo-as-username both 401). So
+ * the browser-facing snibbly links carry the key as URL userinfo and open
+ * without the auth prompt. Injected here at load so the key lives only in
+ * .env, never in dashboard.json, which is committed.
+ */
+function withLlamaSwapKey(url: string, apiKey: string): string {
+  const withAuth = new URL(url);
+  withAuth.username = 'key';
+  withAuth.password = apiKey;
+  return withAuth.toString();
 }
 
 /** The channel name is a topic path segment, so keep it boring like camera names. */
@@ -375,6 +393,9 @@ function loadDashboard(path: string): DashboardConfig {
       if (panel.chat !== undefined && !HTTP_URL.test(panel.chat)) {
         throw new Error(`${path}: panel "${panel.id}" has a non-http(s) "chat" url`);
       }
+      if (panel.dashboard !== undefined && !HTTP_URL.test(panel.dashboard)) {
+        throw new Error(`${path}: panel "${panel.id}" has a non-http(s) "dashboard" url`);
+      }
     } else {
       // `panel` has narrowed to never here, so read the raw JSON shape instead.
       const unknown = panel as unknown as { id: string; type: string };
@@ -476,6 +497,15 @@ export function loadConfig(): AppConfig {
   const llamaSwapBase = optional('LLAMA_SWAP_BASE_URL');
   const llamaSwapKey = optional('LLAMA_SWAP_API_KEY');
   const sttBase = optional('STT_BASE_URL');
+
+  if (llamaSwapKey) {
+    for (const panel of dashboard.panels) {
+      if (panel.type === 'service' && panel.service === 'llamaSwap') {
+        if (panel.chat) panel.chat = withLlamaSwapKey(panel.chat, llamaSwapKey);
+        if (panel.dashboard) panel.dashboard = withLlamaSwapKey(panel.dashboard, llamaSwapKey);
+      }
+    }
+  }
 
   return {
     port: num('PORT', 8099),

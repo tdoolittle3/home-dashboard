@@ -4,8 +4,10 @@ import type { LlamaSwapState, LlamaSwapSummary, SourceResult } from '../types';
 interface InferencePanelProps {
   title: string;
   result: SourceResult<LlamaSwapSummary> | null;
-  /** Browser-facing URL of the llama-swap web UI, from the panel's "chat" in dashboard.json. */
+  /** Browser-facing URL of llama.cpp's chat UI, from the panel's "chat" in dashboard.json (key embedded). */
   chatUrl?: string;
+  /** Browser-facing URL of llama-swap's own /ui/ dashboard, from the panel's "dashboard" (key embedded). */
+  dashboardUrl?: string;
 }
 
 const STATE_DOT: Record<LlamaSwapState, string> = {
@@ -31,7 +33,7 @@ const STATE_LABEL: Record<LlamaSwapState, string> = {
  * three states. llama-swap loads a model when the first chat request names it,
  * so "idle" is the normal resting state, not a fault.
  */
-export function InferencePanel({ title, result, chatUrl }: InferencePanelProps) {
+export function InferencePanel({ title, result, chatUrl, dashboardUrl }: InferencePanelProps) {
   const [open, setOpen] = useState(false);
 
   const status = !result ? 'unknown' : result.ok ? 'up' : 'down';
@@ -83,6 +85,11 @@ export function InferencePanel({ title, result, chatUrl }: InferencePanelProps) 
           {chatUrl ? (
             <a className="panel__open" href={chatUrl} target="_blank" rel="noreferrer">
               Open the full chat UI ↗
+            </a>
+          ) : null}
+          {dashboardUrl ? (
+            <a className="panel__open" href={dashboardUrl} target="_blank" rel="noreferrer">
+              llama-swap dashboard ↗
             </a>
           ) : null}
         </div>
