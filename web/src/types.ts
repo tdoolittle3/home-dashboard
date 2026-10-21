@@ -77,8 +77,10 @@ export type Panel =
       title: string;
       type: 'service';
       service: ServiceName;
-      /** Browser-facing URL for the panel's "Open chat" link (the llamaSwap panel's web UI). */
+      /** Browser-facing URL for the panel's "Open chat" link (llama.cpp's chat UI, key already embedded). */
       chat?: string;
+      /** Browser-facing URL of llama-swap's own /ui/ dashboard, key already embedded. */
+      dashboard?: string;
     }
   | { id: string; title: string; type: 'system'; metrics: SystemMetricRef[] }
   | { id: string; title: string; type: 'ups'; entities: UpsEntityRefs }

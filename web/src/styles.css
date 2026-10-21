@@ -332,13 +332,17 @@ body {
   transform: rotate(225deg);
 }
 
-/* The fold's way out to the full llama-swap chat UI, under the model rows. */
+/* The fold's ways out (chat UI, llama-swap dashboard), under the model rows. */
 .panel__open {
   display: inline-block;
   margin-top: 14px;
   color: var(--accent);
   font-size: var(--fs-sm);
   text-decoration: none;
+}
+
+.panel__open + .panel__open {
+  margin-left: 18px;
 }
 
 .panel__open:hover {

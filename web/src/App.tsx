@@ -103,7 +103,15 @@ export function App() {
         case 'adguard':
           return <DnsPanel key={panel.id} title={panel.title} result={sources.adguard} kuma={sources.uptimeKuma} />;
         case 'llamaSwap':
-          return <InferencePanel key={panel.id} title={panel.title} result={sources.llamaSwap} chatUrl={panel.chat} />;
+          return (
+            <InferencePanel
+              key={panel.id}
+              title={panel.title}
+              result={sources.llamaSwap}
+              chatUrl={panel.chat}
+              dashboardUrl={panel.dashboard}
+            />
+          );
       }
     }
     if (panel.type === 'system') {
