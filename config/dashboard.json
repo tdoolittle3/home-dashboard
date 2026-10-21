@@ -7,7 +7,7 @@
     "A controls panel can also carry 'lights' (a strip of lamp buttons, listed in the order they sit in the room left to right, writable like 'entities') and 'sensors' (read-only door/leak status rows - watched, never writable).",
     "An 'entities' panel with \"chart\": \"disk\" also draws the largest filesystem Frigate reports.",
     "A 'service' panel shows one polled service in depth: \"service\" is uptimeKuma, jellyfin, immich, adguard or llamaSwap. It needs that service's *_BASE_URL and *_API_KEY (for adguard: ADGUARD_USERNAME and ADGUARD_PASSWORD) in .env, and says so when they are missing.",
-    "The llamaSwap panel is snibbly, the inference box: every model llama-swap has configured and which of them are loaded right now (idle is the resting state - llama-swap loads a model when the first request names it). A service panel's optional 'chat' url is the direct llm chat link (llama.cpp's own UI via llama-swap's /upstream/<model>/ route - opening it loads that model) and 'dashboard' is llama-swap's /ui/; both browser-facing, so ts.net like the 'links' urls. llama-swap wants its API key even for these pages, so the server embeds LLAMA_SWAP_API_KEY into both urls as basic-auth userinfo - keep the key out of this file.",
+    "The llamaSwap panel is snibbly, the inference box: every model llama-swap has configured and which of them are loaded right now (idle is the resting state - llama-swap loads a model when the first request names it). A service panel's optional 'chat' url is the direct llm chat link (llama.cpp's own UI via llama-swap's /upstream/<model>/ route - opening it loads that model) and 'dashboard' is llama-swap's /ui/. Both ride the dashboard's own /snibbly/* proxy as site-relative paths: llama-swap wants its API key even for these pages and iPhone Safari ignores keys embedded in a link (it prompts anyway), so the server attaches LLAMA_SWAP_API_KEY on the way through and the browser never sees a login or the key.",
     "The adguard panel is read-only diagnostics - no protection toggle; writes stay HA-entity-only. Its header also shows the two Kuma monitors named exactly 'DNS resolver' and 'AdGuard UI'; rename them in Kuma and the dots go grey here.",
     "A 'system' panel draws host readings as tiles. 'kind' is uptime | percent | value (inferred when omitted); 'warn' and 'crit' are thresholds the reading is compared against.",
     "A 'ups' panel draws the rack UPS as a battery gauge. Its 'entities' object maps the five roles (charge, runtime, load, voltage, problem) to the ladybird_ups MQTT discovery entities; the problem sensor's attributes drive the ok/warning/critical look.",
@@ -43,8 +43,8 @@
       "title": "Snibbly",
       "type": "service",
       "service": "llamaSwap",
-      "chat": "http://snibbly.tail0e6756.ts.net:8080/upstream/8b-abliterated/",
-      "dashboard": "http://snibbly.tail0e6756.ts.net:8080/ui/"
+      "chat": "/snibbly/upstream/8b-abliterated/",
+      "dashboard": "/snibbly/ui/"
     },
     {
       "id": "system",

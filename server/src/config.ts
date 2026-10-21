@@ -78,13 +78,14 @@ export type Panel =
       service: ServiceName;
       /**
        * Browser-facing URL rendered as the panel's "Open chat" link - the
-       * llamaSwap panel's way into llama.cpp's chat UI (the /upstream/<model>/
-       * route). Like `links[].url`, this is what the browser opens, so it is
-       * the Tailscale FQDN, never a LAN IP. loadConfig embeds the llama-swap
-       * API key as URL userinfo so the browser's basic-auth prompt never shows.
+       * llamaSwap panel's way into llama.cpp's chat UI. Site-relative paths
+       * ride the dashboard origin, which is how the snibbly links reach the
+       * /snibbly/* proxy (the server adds the API key there; embedding it in
+       * the link as userinfo loses to iPhone Safari, which ignores it and
+       * prompts anyway).
        */
       chat?: string;
-      /** Browser-facing URL of llama-swap's own /ui/ dashboard; key embedded like `chat`. */
+      /** Browser-facing URL of llama-swap's own /ui/ dashboard; same rules as `chat`. */
       dashboard?: string;
     }
   | {
@@ -224,20 +225,6 @@ function stripTrailingSlash(url: string): string {
   return url.replace(/\/+$/, '');
 }
 
-/**
- * llama-swap gates its web pages with HTTP Basic - any username, the API key
- * as the password (query params and bare userinfo-as-username both 401). So
- * the browser-facing snibbly links carry the key as URL userinfo and open
- * without the auth prompt. Injected here at load so the key lives only in
- * .env, never in dashboard.json, which is committed.
- */
-function withLlamaSwapKey(url: string, apiKey: string): string {
-  const withAuth = new URL(url);
-  withAuth.username = 'key';
-  withAuth.password = apiKey;
-  return withAuth.toString();
-}
-
 /** The channel name is a topic path segment, so keep it boring like camera names. */
 const MESH_CHANNEL_NAME = /^[A-Za-z0-9_-]+$/;
 
@@ -277,6 +264,8 @@ const METRIC_KINDS = new Set<string>(['uptime', 'percent', 'value']);
 /** A bare hostname or host:port; the frontend builds http:// URLs on it verbatim. */
 const HOST_PORT = /^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?(?::\d{1,5})?$/i;
 const HTTP_URL = /^https?:\/\//;
+/** An http(s) url, or a site-relative path for pages the dashboard itself proxies (/snibbly/...). */
+const HTTP_URL_OR_PATH = /^(https?:\/\/|\/)/;
 
 function loadDashboard(path: string): DashboardConfig {
   const raw = readFileSync(resolve(path), 'utf8');
@@ -390,11 +379,11 @@ function loadDashboard(path: string): DashboardConfig {
           `${path}: panel "${panel.id}" has unknown service "${panel.service}" - one of ${SERVICE_NAMES.join(', ')}`,
         );
       }
-      if (panel.chat !== undefined && !HTTP_URL.test(panel.chat)) {
-        throw new Error(`${path}: panel "${panel.id}" has a non-http(s) "chat" url`);
+      if (panel.chat !== undefined && !HTTP_URL_OR_PATH.test(panel.chat)) {
+        throw new Error(`${path}: panel "${panel.id}" needs a "chat" that is an http(s) url or a site-relative path`);
       }
-      if (panel.dashboard !== undefined && !HTTP_URL.test(panel.dashboard)) {
-        throw new Error(`${path}: panel "${panel.id}" has a non-http(s) "dashboard" url`);
+      if (panel.dashboard !== undefined && !HTTP_URL_OR_PATH.test(panel.dashboard)) {
+        throw new Error(`${path}: panel "${panel.id}" needs a "dashboard" that is an http(s) url or a site-relative path`);
       }
     } else {
       // `panel` has narrowed to never here, so read the raw JSON shape instead.
@@ -497,15 +486,6 @@ export function loadConfig(): AppConfig {
   const llamaSwapBase = optional('LLAMA_SWAP_BASE_URL');
   const llamaSwapKey = optional('LLAMA_SWAP_API_KEY');
   const sttBase = optional('STT_BASE_URL');
-
-  if (llamaSwapKey) {
-    for (const panel of dashboard.panels) {
-      if (panel.type === 'service' && panel.service === 'llamaSwap') {
-        if (panel.chat) panel.chat = withLlamaSwapKey(panel.chat, llamaSwapKey);
-        if (panel.dashboard) panel.dashboard = withLlamaSwapKey(panel.dashboard, llamaSwapKey);
-      }
-    }
-  }
 
   return {
     port: num('PORT', 8099),

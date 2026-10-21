@@ -4,9 +4,9 @@ import type { LlamaSwapState, LlamaSwapSummary, SourceResult } from '../types';
 interface InferencePanelProps {
   title: string;
   result: SourceResult<LlamaSwapSummary> | null;
-  /** Browser-facing URL of llama.cpp's chat UI, from the panel's "chat" in dashboard.json (key embedded). */
+  /** llama.cpp's chat UI, from the panel's "chat" in dashboard.json - a /snibbly proxy path. */
   chatUrl?: string;
-  /** Browser-facing URL of llama-swap's own /ui/ dashboard, from the panel's "dashboard" (key embedded). */
+  /** llama-swap's own /ui/ dashboard, from the panel's "dashboard" - a /snibbly proxy path. */
   dashboardUrl?: string;
 }
 
