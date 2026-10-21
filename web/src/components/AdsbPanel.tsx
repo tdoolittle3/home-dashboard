@@ -4,10 +4,11 @@ import { Panel } from './Panel';
 
 interface AdsbPanelProps {
   title: string;
-  /** Host[:port] of tar1090; the iframe, the poll and the full-map link all build on it. */
-  baseHost: string;
   refreshSeconds: number;
 }
+
+/** Site-relative base of the server's tar1090 relay; the iframe, the polls and the full-map link all build on it. */
+const ADSB_BASE = '/adsb';
 
 /** One entry of tar1090's aircraft.json. Everything beyond hex is optional. */
 interface Aircraft {
@@ -105,11 +106,13 @@ interface Row {
  * Live local air traffic from the ADS-B receiver. The tar1090 map is embedded
  * as-is - it is already the best view of the sky - and the table under it is
  * the glanceable summary: who is overhead right now, and is any of it unusual.
- * The browser polls the receiver directly over Tailscale; the dashboard server
- * is not involved, so the panel carries its own offline state.
+ * Everything rides the dashboard origin through the server's /adsb/* relay:
+ * the page may be open over Tailscale HTTPS, where a plain-http receiver URL
+ * is blocked as mixed content. The relay 502s when the receiver is down, so
+ * the panel still carries its own offline state.
  */
-export function AdsbPanel({ title, baseHost, refreshSeconds }: AdsbPanelProps) {
-  const mapUrl = `http://${baseHost}/`;
+export function AdsbPanel({ title, refreshSeconds }: AdsbPanelProps) {
+  const mapUrl = `${ADSB_BASE}/`;
   // On a phone tar1090's top button row (U/H/T) lands on the selected-aircraft
   // card's close box, so a tapped plane can never be dismissed. Pinch-zoom
   // covers the lost +/-; the full-map link keeps every control. Read once:
@@ -136,7 +139,7 @@ export function AdsbPanel({ title, baseHost, refreshSeconds }: AdsbPanelProps) {
       // answers - it 404s on builds that do not publish their location.
       if (!receiverRef.current) {
         try {
-          const response = await fetch(`http://${baseHost}/data/receiver.json`);
+          const response = await fetch(`${ADSB_BASE}/data/receiver.json`);
           if (response.ok) {
             const body = (await response.json()) as Receiver;
             if (typeof body.lat === 'number' && typeof body.lon === 'number') {
@@ -153,7 +156,7 @@ export function AdsbPanel({ title, baseHost, refreshSeconds }: AdsbPanelProps) {
       }
 
       try {
-        const response = await fetch(`http://${baseHost}/data/aircraft.json`);
+        const response = await fetch(`${ADSB_BASE}/data/aircraft.json`);
         if (!response.ok) throw new Error(String(response.status));
         const body = (await response.json()) as AircraftFeed;
         if (!alive) return;
@@ -172,7 +175,7 @@ export function AdsbPanel({ title, baseHost, refreshSeconds }: AdsbPanelProps) {
       alive = false;
       clearInterval(timer);
     };
-  }, [baseHost, refreshSeconds]);
+  }, [refreshSeconds]);
 
   const tracked = aircraft?.length ?? 0;
   const withPosition = aircraft?.filter((a) => typeof a.lat === 'number' && typeof a.lon === 'number').length ?? 0;

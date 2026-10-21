@@ -108,10 +108,10 @@ export type Panel =
       title: string;
       type: 'adsb';
       /**
-       * Host[:port] of the tar1090 instance, e.g. "ladybird:8080". The browser
-       * talks to it directly (iframe, aircraft.json poll, full-map link), so it
-       * must resolve from wherever the dashboard is open - the Tailscale
-       * MagicDNS name, never a LAN IP.
+       * Host[:port] of the tar1090 instance, e.g. "ladybird:8080". The server's
+       * /adsb/* relay dials it; the browser only ever sees the dashboard
+       * origin, so it needs to resolve from inside the container, and a LAN
+       * address is fine.
        */
       baseHost: string;
       /** How often the aircraft table refreshes. Default 8. */
@@ -178,6 +178,8 @@ export interface AppConfig {
   llamaSwap: { baseUrl: string; apiKey: string } | null;
   /** whisper.cpp server for the assistant's mic button (stacks/stt on ladybird). */
   stt: { baseUrl: string } | null;
+  /** tar1090 instance the /adsb/* relay dials. Derived from the 'adsb' panel's baseHost. */
+  adsb: { baseUrl: string } | null;
   /**
    * Meshtastic-over-MQTT. `channel` is the channel NAME (an uplink topic
    * segment); `channelIndex` is the numeric index downlink sends go out on -
@@ -261,7 +263,7 @@ function loadMesh(): AppConfig['mesh'] {
 
 const ENTITY_ID = /^[a-z_]+\.[a-z0-9_]+$/;
 const METRIC_KINDS = new Set<string>(['uptime', 'percent', 'value']);
-/** A bare hostname or host:port; the frontend builds http:// URLs on it verbatim. */
+/** A bare hostname or host:port; the server builds the http:// relay target on it verbatim. */
 const HOST_PORT = /^[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?(?::\d{1,5})?$/i;
 const HTTP_URL = /^https?:\/\//;
 /** An http(s) url, or a site-relative path for pages the dashboard itself proxies (/snibbly/...). */
@@ -438,6 +440,7 @@ export function loadConfig(): AppConfig {
   const watched = new Set<string>();
   const controllable = new Set<string>();
   const cameras = new Set<string>();
+  let adsbHost: string | null = null;
 
   for (const panel of dashboard.panels) {
     switch (panel.type) {
@@ -461,8 +464,14 @@ export function loadConfig(): AppConfig {
       case 'cameras':
         for (const camera of panel.cameras) cameras.add(camera.name);
         break;
-      case 'service':
       case 'adsb':
+        // One relay, one receiver: a second instance would need its own prefix.
+        if (adsbHost !== null && adsbHost !== panel.baseHost) {
+          throw new Error(`adsb panels disagree on baseHost ("${adsbHost}" vs "${panel.baseHost}") - the /adsb relay dials one receiver`);
+        }
+        adsbHost = panel.baseHost;
+        break;
+      case 'service':
       case 'mesh':
         // These panels read their own APIs, not HA entities.
         break;
@@ -502,6 +511,7 @@ export function loadConfig(): AppConfig {
     llamaSwap:
       llamaSwapBase && llamaSwapKey ? { baseUrl: stripTrailingSlash(llamaSwapBase), apiKey: llamaSwapKey } : null,
     stt: sttBase ? { baseUrl: stripTrailingSlash(sttBase) } : null,
+    adsb: adsbHost ? { baseUrl: `http://${adsbHost}` } : null,
     mesh: loadMesh(),
     sourceTtlMs: num('SOURCE_TTL_SECONDS', 10) * 1000,
     sourcePushMs: num('SOURCE_PUSH_SECONDS', 15) * 1000,

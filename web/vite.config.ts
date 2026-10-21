@@ -11,6 +11,8 @@ export default defineConfig({
     // so the frontend never needs to know the backend's origin.
     proxy: {
       '/api': { target: API_TARGET, changeOrigin: true },
+      // The adsb panel's iframe and polls are site-relative too; same forwarding.
+      '/adsb': { target: API_TARGET, changeOrigin: true },
     },
   },
   build: { outDir: 'dist', sourcemap: true },

@@ -95,7 +95,7 @@ export type Panel =
       id: string;
       title: string;
       type: 'adsb';
-      /** Host[:port] of tar1090, e.g. "ladybird:8080"; iframe, poll and full-map link all build on it. */
+      /** Host[:port] of tar1090; the server's /adsb/* relay dials it, the browser never does. */
       baseHost: string;
       refreshSeconds?: number;
     };
