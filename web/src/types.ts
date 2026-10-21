@@ -77,9 +77,9 @@ export type Panel =
       title: string;
       type: 'service';
       service: ServiceName;
-      /** Browser-facing URL for the panel's "Open chat" link (llama.cpp's chat UI, key already embedded). */
+      /** The panel's "Open chat" link (llama.cpp's chat UI) - a site-relative /snibbly proxy path. */
       chat?: string;
-      /** Browser-facing URL of llama-swap's own /ui/ dashboard, key already embedded. */
+      /** llama-swap's own /ui/ dashboard, also a site-relative /snibbly proxy path. */
       dashboard?: string;
     }
   | { id: string; title: string; type: 'system'; metrics: SystemMetricRef[] }
