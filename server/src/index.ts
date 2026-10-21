@@ -6,6 +6,7 @@ import Fastify from 'fastify';
 import { loadConfig } from './config.js';
 import { HaClient } from './ha/client.js';
 import { MeshClient } from './mesh/client.js';
+import { registerAdsbRoutes } from './routes/adsb.js';
 import { registerApiRoutes } from './routes/api.js';
 import { registerSnibblyRoutes } from './routes/snibbly.js';
 import { registerStreamRoute } from './routes/stream.js';
@@ -44,6 +45,7 @@ async function main(): Promise<void> {
   registerApiRoutes(app, config, ha, snapshots, mesh);
   registerStreamRoute(app, config, ha, snapshots, mesh);
   registerSnibblyRoutes(app, config);
+  registerAdsbRoutes(app, config);
 
   const webDist = resolveWebDist();
   if (webDist) {

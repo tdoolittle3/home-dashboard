@@ -125,12 +125,7 @@ export function App() {
     }
     if (panel.type === 'adsb') {
       return (
-        <AdsbPanel
-          key={panel.id}
-          title={panel.title}
-          baseHost={panel.baseHost}
-          refreshSeconds={panel.refreshSeconds ?? 8}
-        />
+        <AdsbPanel key={panel.id} title={panel.title} refreshSeconds={panel.refreshSeconds ?? 8} />
       );
     }
     if (panel.chart === 'disk') {
