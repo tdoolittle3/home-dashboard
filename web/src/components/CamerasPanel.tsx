@@ -18,17 +18,16 @@ interface CamerasPanelProps {
 type FrigateEventRow = FrigateSummary['recentEvents'][number];
 
 /**
- * Where a detection row leads: the clip itself, or its snapshot while Frigate
- * has no clip yet. Both come from this dashboard's own origin - the server
- * proxies them, because a device that can reach the dashboard may have no
- * route to Frigate's port, and Frigate cannot answer the byte-range requests
- * iPhone Safari demands before it will play an MP4.
+ * Where a detection row leads: Frigate's review player, via the server's
+ * same-origin redirect. The proxied MP4 (the old target) plays in a Safari
+ * tab but renders a dead grey player in the standalone home-screen app, so
+ * the server resolves the event to its review item and redirects to the one
+ * UI that plays recordings everywhere. Events with no review item fall back
+ * to the proxied clip or snapshot on the server side.
  */
 function eventHref(event: FrigateEventRow): string | undefined {
-  const id = encodeURIComponent(event.id);
-  if (event.hasClip) return `/api/events/${id}/clip.mp4`;
-  if (event.hasSnapshot) return `/api/events/${id}/snapshot.jpg`;
-  return undefined;
+  if (!event.hasClip && !event.hasSnapshot) return undefined;
+  return `/api/events/${encodeURIComponent(event.id)}/review`;
 }
 
 /**

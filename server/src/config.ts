@@ -170,7 +170,13 @@ export interface AppConfig {
   port: number;
   host: string;
   ha: { baseUrl: string; token: string };
-  frigate: { baseUrl: string } | null;
+  /**
+   * `baseUrl` is what this server dials (LAN IP); `publicUrl` is the same
+   * Frigate as the browser reaches it (the tailnet name), used only to build
+   * the /api/events/:id/review redirect. Unset publicUrl = no redirect, the
+   * detection links fall back to the proxied clip.
+   */
+  frigate: { baseUrl: string; publicUrl: string | null } | null;
   jellyfin: { baseUrl: string; apiKey: string } | null;
   uptimeKuma: { baseUrl: string; apiKey: string } | null;
   immich: { baseUrl: string; apiKey: string } | null;
@@ -489,6 +495,7 @@ export function loadConfig(): AppConfig {
   const immichBase = optional('IMMICH_BASE_URL');
   const immichKey = optional('IMMICH_API_KEY');
   const frigateBase = optional('FRIGATE_BASE_URL');
+  const frigatePublic = optional('FRIGATE_PUBLIC_URL');
   const adguardBase = optional('ADGUARD_BASE_URL');
   const adguardUser = optional('ADGUARD_USERNAME');
   const adguardPass = optional('ADGUARD_PASSWORD');
@@ -500,7 +507,12 @@ export function loadConfig(): AppConfig {
     port: num('PORT', 8099),
     host: process.env['HOST']?.trim() || '0.0.0.0',
     ha: { baseUrl: stripTrailingSlash(required('HA_BASE_URL')), token: required('HA_TOKEN') },
-    frigate: frigateBase ? { baseUrl: stripTrailingSlash(frigateBase) } : null,
+    frigate: frigateBase
+      ? {
+          baseUrl: stripTrailingSlash(frigateBase),
+          publicUrl: frigatePublic ? stripTrailingSlash(frigatePublic) : null,
+        }
+      : null,
     jellyfin: jellyfinBase && jellyfinKey ? { baseUrl: stripTrailingSlash(jellyfinBase), apiKey: jellyfinKey } : null,
     uptimeKuma: kumaBase && kumaKey ? { baseUrl: stripTrailingSlash(kumaBase), apiKey: kumaKey } : null,
     immich: immichBase && immichKey ? { baseUrl: stripTrailingSlash(immichBase), apiKey: immichKey } : null,
