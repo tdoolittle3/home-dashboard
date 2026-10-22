@@ -393,7 +393,7 @@ export function registerApiRoutes(
   const eventBase = async (
     id: string,
     reply: { code: (status: number) => { send: (body: unknown) => unknown } },
-  ): Promise<string | null> => {
+  ): Promise<{ base: string; hasClip: boolean } | null> => {
     if (!config.frigate) {
       reply.code(503).send({ error: 'FRIGATE_BASE_URL is not configured' });
       return null;
@@ -404,8 +404,10 @@ export function registerApiRoutes(
     }
     const base = `${config.frigate.baseUrl}/api/events/${encodeURIComponent(id)}`;
     try {
-      const event = await getJson<{ camera?: unknown }>(base, { timeoutMs: 8_000 });
-      if (typeof event.camera === 'string' && config.proxyableCameras.has(event.camera)) return base;
+      const event = await getJson<{ camera?: unknown; has_clip?: unknown }>(base, { timeoutMs: 8_000 });
+      if (typeof event.camera === 'string' && config.proxyableCameras.has(event.camera)) {
+        return { base, hasClip: event.has_clip === true };
+      }
     } catch {
       // Expired or never existed - same answer either way.
     }
@@ -413,12 +415,43 @@ export function registerApiRoutes(
     return null;
   };
 
+  /**
+   * Where a detection row actually lands: Frigate's own review player, via
+   * redirect. The proxied clip below plays in a plain Safari tab but renders a
+   * dead grey player in the standalone (home-screen) app, so the link now
+   * resolves the event to its review item and hands the phone to the one UI
+   * known to play recordings there. The target is the browser-facing origin -
+   * the phone reaches Frigate over the tailnet, not this container's LAN dial.
+   */
+  app.get<{ Params: { id: string } }>('/api/events/:id/review', async (request, reply) => {
+    const event = await eventBase(request.params.id, reply);
+    if (!event) return;
+
+    reply.header('Cache-Control', 'no-store');
+    const publicUrl = config.frigate?.publicUrl;
+    if (publicUrl) {
+      try {
+        const review = await getJson<{ id?: unknown }>(
+          `${config.frigate!.baseUrl}/api/review/event/${encodeURIComponent(request.params.id)}`,
+          { timeoutMs: 8_000 },
+        );
+        if (typeof review.id === 'string') {
+          return reply.redirect(`${publicUrl}/review?id=${encodeURIComponent(review.id)}`, 302);
+        }
+      } catch {
+        // Below Frigate's alert/detection bar, so no review item - fall through.
+      }
+    }
+    const id = encodeURIComponent(request.params.id);
+    return reply.redirect(event.hasClip ? `/api/events/${id}/clip.mp4` : `/api/events/${id}/snapshot.jpg`, 302);
+  });
+
   app.get<{ Params: { id: string } }>('/api/events/:id/snapshot.jpg', async (request, reply) => {
-    const base = await eventBase(request.params.id, reply);
-    if (!base) return;
+    const event = await eventBase(request.params.id, reply);
+    if (!event) return;
 
     try {
-      const upstream = await fetchWithTimeout(`${base}/snapshot.jpg`, { timeoutMs: 8_000 });
+      const upstream = await fetchWithTimeout(`${event.base}/snapshot.jpg`, { timeoutMs: 8_000 });
       if (!upstream.ok) {
         return reply.code(502).send({ error: `frigate returned ${upstream.status}` });
       }
@@ -432,14 +465,14 @@ export function registerApiRoutes(
   });
 
   app.get<{ Params: { id: string } }>('/api/events/:id/clip.mp4', async (request, reply) => {
-    const base = await eventBase(request.params.id, reply);
-    if (!base) return;
+    const event = await eventBase(request.params.id, reply);
+    if (!event) return;
 
     let clip: Buffer;
     try {
       // Event clips run seconds, not minutes; whole-clip buffering stays small
       // and is what makes the range handling below possible.
-      const upstream = await fetchWithTimeout(`${base}/clip.mp4`, { timeoutMs: 30_000 });
+      const upstream = await fetchWithTimeout(`${event.base}/clip.mp4`, { timeoutMs: 30_000 });
       if (!upstream.ok) {
         return reply.code(502).send({ error: `frigate returned ${upstream.status}` });
       }
