@@ -76,6 +76,10 @@ export function createLlamaSwapSource(baseUrl: string, apiKey: string) {
     for (const raw of list.data ?? []) {
       const id = toStringOrNull(raw.id);
       if (!id) continue;
+      // Through LiteLLM the catalogue is its openai/* wildcard expanded to a
+      // couple hundred upstream model names that never run here - noise, not
+      // inventory. Anything llama-swap itself serves has no such prefix.
+      if (running === null && id.startsWith('openai/')) continue;
       models.push({
         id,
         name: toStringOrNull(raw.name),
