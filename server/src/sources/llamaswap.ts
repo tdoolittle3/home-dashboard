@@ -54,13 +54,18 @@ export function createLlamaSwapSource(baseUrl: string, apiKey: string) {
   const headers = { Authorization: `Bearer ${apiKey}`, Accept: 'application/json' };
 
   return async function fetchLlamaSwap(): Promise<LlamaSwapSummary> {
+    // Since the langfuse capture deploy, LiteLLM fronts :8080 and passes the
+    // OpenAI-style routes through to llama-swap but 404s its bespoke /running.
+    // The catalogue answering is what "snibbly is up" means; per-model load
+    // state is a bonus we only get when talking to llama-swap directly, so a
+    // failed /running degrades every model to 'off' instead of sinking the tile.
     const [list, running] = await Promise.all([
       getJson<RawModelList>(`${baseUrl}/v1/models`, { headers }),
-      getJson<RawRunning>(`${baseUrl}/running`, { headers }),
+      getJson<RawRunning>(`${baseUrl}/running`, { headers }).catch(() => null),
     ]);
 
     const states = new Map<string, LlamaSwapState>();
-    for (const entry of running.running ?? []) {
+    for (const entry of running?.running ?? []) {
       const model = toStringOrNull(entry.model);
       const state = toStringOrNull(entry.state);
       if (!model) continue;
