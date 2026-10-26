@@ -116,7 +116,9 @@ export class SnapshotBuilder {
     // The adguard source paces itself per endpoint (stats 30s, query log 10s,
     // backoff on errors); this outer cache only coalesces concurrent builds.
     const adguardSource = adguard ? createAdguardSource(adguard.baseUrl, adguard.username, adguard.password) : null;
-    const llamaSwapSource = llamaSwap ? createLlamaSwapSource(llamaSwap.baseUrl, llamaSwap.apiKey) : null;
+    // Dials llama-swap directly (uiBaseUrl), not LiteLLM: only there do
+    // /v1/models and /running return the real local catalogue and load state.
+    const llamaSwapSource = llamaSwap ? createLlamaSwapSource(llamaSwap.uiBaseUrl, llamaSwap.apiKey) : null;
 
     this.#frigate = frigateSource ? cached(ttl, () => toResult('frigate', frigateSource)) : null;
     this.#jellyfin = jellyfinSource ? cached(ttl, () => toResult('jellyfin', jellyfinSource)) : null;
