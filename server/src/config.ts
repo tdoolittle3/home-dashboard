@@ -87,6 +87,13 @@ export type Panel =
       chat?: string;
       /** Browser-facing URL of llama-swap's own /ui/ dashboard; same rules as `chat`. */
       dashboard?: string;
+      /**
+       * Browser-facing URL of the Langfuse trace UI. Unlike `chat`/`dashboard`,
+       * Langfuse is a separate app on snibbly with its own login, not a
+       * llama-swap surface - so this is an absolute link to snibbly's own
+       * tailnet name (snibbly.tail0e6756.ts.net:3000), not a /snibbly proxy path.
+       */
+      langfuse?: string;
     }
   | {
       id: string;
