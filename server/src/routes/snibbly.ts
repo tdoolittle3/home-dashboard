@@ -54,7 +54,9 @@ export function registerSnibblyRoutes(app: FastifyInstance, config: AppConfig): 
 
     instance.all('/snibbly/*', async (request, reply) => {
       // raw.url keeps the query string and any percent-encoding verbatim.
-      const target = `${llamaSwap.baseUrl}${request.raw.url?.slice('/snibbly'.length) ?? '/'}`;
+      // uiBaseUrl is llama-swap itself: LiteLLM (baseUrl) has no /ui or
+      // /upstream pages, it would 404 every link this proxy exists to serve.
+      const target = `${llamaSwap.uiBaseUrl}${request.raw.url?.slice('/snibbly'.length) ?? '/'}`;
 
       const headers: Record<string, string> = {};
       for (const [name, value] of Object.entries(request.headers)) {

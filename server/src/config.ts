@@ -181,7 +181,15 @@ export interface AppConfig {
   uptimeKuma: { baseUrl: string; apiKey: string } | null;
   immich: { baseUrl: string; apiKey: string } | null;
   adguard: { baseUrl: string; username: string; password: string } | null;
-  llamaSwap: { baseUrl: string; apiKey: string } | null;
+  /**
+   * `baseUrl` is the chat door - LiteLLM on snibbly:8080, so /api/chat traffic
+   * is captured by Langfuse. `uiBaseUrl` is llama-swap itself (snibbly:9292):
+   * LiteLLM fronts the OpenAI chat API but has neither llama-swap's /running
+   * (real model load state) nor its /ui and /upstream pages, so the status
+   * panel and the /snibbly UI proxy must dial llama-swap directly. Defaults to
+   * baseUrl for a plain single-door llama-swap deployment.
+   */
+  llamaSwap: { baseUrl: string; apiKey: string; uiBaseUrl: string } | null;
   /** whisper.cpp server for the assistant's mic button (stacks/stt on ladybird). */
   stt: { baseUrl: string } | null;
   /** tar1090 instance the /adsb/* relay dials. Derived from the 'adsb' panel's baseHost. */
@@ -501,6 +509,7 @@ export function loadConfig(): AppConfig {
   const adguardPass = optional('ADGUARD_PASSWORD');
   const llamaSwapBase = optional('LLAMA_SWAP_BASE_URL');
   const llamaSwapKey = optional('LLAMA_SWAP_API_KEY');
+  const llamaSwapUiBase = optional('LLAMA_SWAP_UI_BASE_URL');
   const sttBase = optional('STT_BASE_URL');
 
   return {
@@ -521,7 +530,13 @@ export function loadConfig(): AppConfig {
         ? { baseUrl: stripTrailingSlash(adguardBase), username: adguardUser, password: adguardPass }
         : null,
     llamaSwap:
-      llamaSwapBase && llamaSwapKey ? { baseUrl: stripTrailingSlash(llamaSwapBase), apiKey: llamaSwapKey } : null,
+      llamaSwapBase && llamaSwapKey
+        ? {
+            baseUrl: stripTrailingSlash(llamaSwapBase),
+            apiKey: llamaSwapKey,
+            uiBaseUrl: stripTrailingSlash(llamaSwapUiBase || llamaSwapBase),
+          }
+        : null,
     stt: sttBase ? { baseUrl: stripTrailingSlash(sttBase) } : null,
     adsb: adsbHost ? { baseUrl: `http://${adsbHost}` } : null,
     mesh: loadMesh(),
