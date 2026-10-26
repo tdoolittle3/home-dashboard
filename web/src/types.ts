@@ -81,6 +81,8 @@ export type Panel =
       chat?: string;
       /** llama-swap's own /ui/ dashboard, also a site-relative /snibbly proxy path. */
       dashboard?: string;
+      /** Langfuse trace UI - an absolute link to snibbly's own tailnet name (own login, not a proxy path). */
+      langfuse?: string;
     }
   | { id: string; title: string; type: 'system'; metrics: SystemMetricRef[] }
   | { id: string; title: string; type: 'ups'; entities: UpsEntityRefs }

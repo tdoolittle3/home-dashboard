@@ -8,6 +8,8 @@ interface InferencePanelProps {
   chatUrl?: string;
   /** llama-swap's own /ui/ dashboard, from the panel's "dashboard" - a /snibbly proxy path. */
   dashboardUrl?: string;
+  /** Langfuse trace UI, from the panel's "langfuse" - an absolute link to snibbly's tailnet name. */
+  langfuseUrl?: string;
 }
 
 const STATE_DOT: Record<LlamaSwapState, string> = {
@@ -33,7 +35,7 @@ const STATE_LABEL: Record<LlamaSwapState, string> = {
  * three states. llama-swap loads a model when the first chat request names it,
  * so "idle" is the normal resting state, not a fault.
  */
-export function InferencePanel({ title, result, chatUrl, dashboardUrl }: InferencePanelProps) {
+export function InferencePanel({ title, result, chatUrl, dashboardUrl, langfuseUrl }: InferencePanelProps) {
   const [open, setOpen] = useState(false);
 
   const status = !result ? 'unknown' : result.ok ? 'up' : 'down';
@@ -90,6 +92,11 @@ export function InferencePanel({ title, result, chatUrl, dashboardUrl }: Inferen
           {dashboardUrl ? (
             <a className="panel__open" href={dashboardUrl} target="_blank" rel="noreferrer">
               llama-swap dashboard ↗
+            </a>
+          ) : null}
+          {langfuseUrl ? (
+            <a className="panel__open" href={langfuseUrl} target="_blank" rel="noreferrer">
+              Langfuse traces ↗
             </a>
           ) : null}
         </div>

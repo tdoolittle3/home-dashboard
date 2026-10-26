@@ -110,6 +110,7 @@ export function App() {
               result={sources.llamaSwap}
               chatUrl={panel.chat}
               dashboardUrl={panel.dashboard}
+              langfuseUrl={panel.langfuse}
             />
           );
       }

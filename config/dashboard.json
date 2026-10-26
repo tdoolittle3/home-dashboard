@@ -44,7 +44,8 @@
       "type": "service",
       "service": "llamaSwap",
       "chat": "/snibbly/upstream/8b-abliterated/",
-      "dashboard": "/snibbly/ui/"
+      "dashboard": "/snibbly/ui/",
+      "langfuse": "http://snibbly.tail0e6756.ts.net:3000"
     },
     {
       "id": "system",
