@@ -149,7 +149,7 @@ export function registerApiRoutes(
       return reply.code(403).send({ error: 'mesh send is not enabled on this dashboard' });
     }
 
-    const body = (request.body ?? {}) as { text?: unknown };
+    const body = (request.body ?? {}) as { text?: unknown; channel?: unknown };
     const text = typeof body.text === 'string' ? body.text.trim() : '';
     if (text.length === 0) {
       return reply.code(400).send({ error: 'text must be a non-empty string' });
@@ -157,10 +157,18 @@ export function registerApiRoutes(
     if (Buffer.byteLength(text, 'utf8') > MESH_TEXT_MAX_BYTES) {
       return reply.code(400).send({ error: `text must fit in ${MESH_TEXT_MAX_BYTES} bytes` });
     }
-    if (!mesh.canSend) {
-      // Either the broker is down or MESH_GATEWAY_NODE / MESH_CHANNEL_INDEX
-      // are unset (read-only mode); the status pill already says which.
-      return reply.code(503).send({ error: 'mesh send is not available right now' });
+    // Default to the home channel; any channel whose TX index the client has
+    // learned from uplink traffic is fair game.
+    const channel =
+      typeof body.channel === 'string' && body.channel.length > 0 ? body.channel : undefined;
+    if (channel !== undefined && !/^[A-Za-z0-9_-]+$/.test(channel)) {
+      return reply.code(400).send({ error: 'channel must be a channel name ([A-Za-z0-9_-]+)' });
+    }
+    if (!mesh.canSendOn(channel ?? config.mesh?.channel ?? '')) {
+      // Either the broker is down, MESH_GATEWAY_NODE is unset (read-only
+      // mode), or this channel's TX index is unknown; the panel only offers
+      // channels from the summary's `sendable` list, so this is a backstop.
+      return reply.code(503).send({ error: 'mesh send is not available on that channel right now' });
     }
     const now = Date.now();
     if (now - meshLastSendAt < MESH_SEND_COOLDOWN_MS) {
@@ -168,7 +176,7 @@ export function registerApiRoutes(
     }
 
     try {
-      mesh.send(text);
+      mesh.send(text, channel);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       return reply.code(502).send({ error: message });

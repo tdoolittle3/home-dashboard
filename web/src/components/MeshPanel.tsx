@@ -66,10 +66,11 @@ export function MeshPanel({ title, mesh, maxMessages = 20 }: MeshPanelProps) {
     );
   }
 
-  const { status, channel, canSend } = mesh;
+  const { status, channel } = mesh;
   const nodes = new Map(mesh.nodes.map((node) => [node.num, node]));
-  // Sends only ever leave on the home channel, so the composer lives on its tab.
-  const onHomeTab = active === channel;
+  // Sendable = the server knows this channel's TX index (learned from uplink
+  // traffic, or configured for the home channel) and has a gateway node.
+  const canSendHere = mesh.sendable.includes(active);
 
   const submit = async (event: FormEvent): Promise<void> => {
     event.preventDefault();
@@ -78,7 +79,7 @@ export function MeshPanel({ title, mesh, maxMessages = 20 }: MeshPanelProps) {
     setBusy(true);
     setError(null);
     try {
-      await sendMeshText(text);
+      await sendMeshText(text, active);
       // 202 means the broker took it; the echoed message rides the stream.
       setDraft('');
     } catch (cause) {
@@ -145,24 +146,24 @@ export function MeshPanel({ title, mesh, maxMessages = 20 }: MeshPanelProps) {
         </ul>
       )}
 
-      {onHomeTab ? (
+      {canSendHere ? (
         <form className="mesh__send" onSubmit={(event) => void submit(event)}>
           <input
             type="text"
             value={draft}
             maxLength={TEXT_MAX_BYTES}
-            placeholder={canSend ? `Message ${channel}` : 'Sending unavailable'}
-            disabled={!canSend || busy}
+            placeholder={`Message ${active}`}
+            disabled={busy}
             onChange={(event) => setDraft(event.target.value)}
-            aria-label={`Message the ${channel} channel`}
+            aria-label={`Message the ${active} channel`}
           />
-          <button type="submit" className="toggle" disabled={!canSend || busy || draft.trim().length === 0}>
+          <button type="submit" className="toggle" disabled={busy || draft.trim().length === 0}>
             {busy ? 'Sending…' : 'Send'}
           </button>
         </form>
       ) : null}
       {error ? <p className="empty text-alert">{error}</p> : null}
-      {onHomeTab && !canSend && status.connected ? (
+      {active === channel && !canSendHere && status.connected ? (
         <p className="empty">
           Read-only: set MESH_GATEWAY_NODE and MESH_CHANNEL_INDEX in <code>.env</code> to enable sending.
         </p>

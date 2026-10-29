@@ -69,7 +69,14 @@ export interface MeshSummary {
    * contains `channel`.
    */
   channels: string[];
-  canSend: boolean;
+  /**
+   * Channels sends can go out on: the gateway node is configured and the
+   * channel's TX index is known - seeded from MESH_CHANNEL_INDEX, learned for
+   * the rest from the `channel` field uplink envelopes carry. Whether the
+   * gateway actually transmits also needs downlink enabled on that channel in
+   * its device config; the firmware drops the request silently otherwise.
+   */
+  sendable: string[];
   /** Oldest first, capped at MESSAGE_CAP per channel. */
   messages: MeshMessage[];
   /** Sorted by lastHeard, newest first. */
@@ -116,6 +123,12 @@ export class MeshClient {
    * while texts are rare, so this is what makes a channel's tab appear promptly.
    */
   #channelsSeen = new Set<string>();
+  /**
+   * Channel name -> the gateway's TX index for it, learned from the `channel`
+   * field uplink envelopes carry (and seeded from config for the home
+   * channel). Downlink sends select their channel by this number.
+   */
+  #channelIndexes = new Map<string, number>();
   #nodes = new Map<number, MeshNode>();
   #status: MeshStatus = { connected: false, gatewayOnline: null, lastError: null };
   /** Dashboard-sent messages need ids too; the envelope ids are positive, so count down. */
@@ -139,6 +152,9 @@ export class MeshClient {
     this.#jsonPrefix = `${root}/2/json/`;
     this.#statPrefix = `${root}/2/stat/`;
     this.#downlinkTopic = `${root}/2/json/mqtt/`;
+    if (config.channelIndex !== null) {
+      this.#channelIndexes.set(config.channel, config.channelIndex);
+    }
   }
 
   get status(): MeshStatus {
@@ -178,34 +194,39 @@ export class MeshClient {
     return () => this.#listeners.delete(listener);
   }
 
-  get canSend(): boolean {
+  canSendOn(channelName: string): boolean {
     return (
-      this.#status.connected && this.#config.gatewayNode !== null && this.#config.channelIndex !== null
+      this.#status.connected &&
+      this.#config.gatewayNode !== null &&
+      this.#channelIndexes.has(channelName)
     );
   }
 
   summary(): MeshSummary {
     const home = this.#config.channel;
     const others = [...this.#channelsSeen].filter((name) => name !== home).sort();
+    const channels = [...others, home];
     return {
       status: this.status,
       channel: home,
-      channels: [...others, home],
-      canSend: this.canSend,
+      channels,
+      sendable: channels.filter((name) => this.canSendOn(name)),
       messages: [...this.#messages.values()].flat().sort((a, b) => a.timestamp - b.timestamp),
       nodes: [...this.#nodes.values()].sort((a, b) => b.lastHeard - a.lastHeard),
     };
   }
 
   /**
-   * Publish a text message for the gateway to transmit on the configured
-   * channel. The firmware requires `from` to be the gateway's own node number
-   * and silently drops anything else.
+   * Publish a text message for the gateway to transmit on the given channel
+   * (default: the home channel). The firmware requires `from` to be the
+   * gateway's own node number and silently drops anything else - and it also
+   * silently drops channels without downlink enabled in its device config.
    */
-  send(text: string): void {
-    const { gatewayNode, channelIndex } = this.#config;
+  send(text: string, channelName: string = this.#config.channel): void {
+    const { gatewayNode } = this.#config;
+    const channelIndex = this.#channelIndexes.get(channelName);
     const client = this.#client;
-    if (!client || !this.canSend || gatewayNode === null || channelIndex === null) {
+    if (!client || !this.#status.connected || gatewayNode === null || channelIndex === undefined) {
       throw new Error('mesh send is not available');
     }
     client.publish(
@@ -219,7 +240,7 @@ export class MeshClient {
       from: 0,
       to: 4_294_967_295,
       channel: channelIndex,
-      channelName: this.#config.channel,
+      channelName,
       text,
       timestamp: nowSeconds(),
       viaDashboard: true,
@@ -252,7 +273,13 @@ export class MeshClient {
     // The downlink topic sits under the json prefix too (`.../json/mqtt/`), so
     // our own publishes echo back with 'mqtt' (or nothing) as the "channel".
     const realChannel = channelName.length > 0 && channelName !== 'mqtt';
-    if (realChannel) this.#channelsSeen.add(channelName);
+    if (realChannel) {
+      this.#channelsSeen.add(channelName);
+      // Envelopes carry the gateway's numeric index for the channel they rode
+      // in on - remember it so sends can target this channel too.
+      const index = numberOr(envelope.channel, null);
+      if (index !== null) this.#channelIndexes.set(channelName, index);
+    }
 
     this.#upsertNode(envelope, timestamp);
 
@@ -278,7 +305,7 @@ export class MeshClient {
       // radio's copy or every dashboard message shows twice.
       if (
         envelope.from === this.#config.gatewayNode &&
-        (this.#messages.get(this.#config.channel) ?? []).some(
+        (this.#messages.get(channelName) ?? []).some(
           (m) => m.viaDashboard && m.text === text && Math.abs(timestamp - m.timestamp) < 60,
         )
       ) {
