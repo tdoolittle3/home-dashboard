@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { sendMeshText } from '../api';
 import { formatEventTime, formatRelative } from '../format';
 import type { MeshMessage, MeshNode, MeshSummary } from '../types';
+import { Collapsible } from './Collapsible';
 import { Panel } from './Panel';
 
 interface MeshPanelProps {
@@ -38,14 +39,22 @@ export function MeshPanel({ title, mesh, maxMessages = 20 }: MeshPanelProps) {
   const [draft, setDraft] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // null = "no choice made": follow the server's first tab (the public channel
+  // when one has traffic) until the user picks one themselves.
+  const [picked, setPicked] = useState<string | null>(null);
   const feedRef = useRef<HTMLUListElement>(null);
-  const messageCount = mesh?.messages.length ?? 0;
+
+  const channels = mesh?.channels ?? [];
+  const active = picked !== null && channels.includes(picked) ? picked : channels[0] ?? '';
+  const messages = (mesh?.messages ?? [])
+    .filter((message) => message.channelName === active)
+    .slice(-maxMessages);
 
   // Keep the feed pinned to the newest message; it reads bottom-up like chat.
   useEffect(() => {
     const feed = feedRef.current;
     if (feed) feed.scrollTop = feed.scrollHeight;
-  }, [messageCount]);
+  }, [messages.length, active]);
 
   if (!mesh) {
     return (
@@ -59,7 +68,8 @@ export function MeshPanel({ title, mesh, maxMessages = 20 }: MeshPanelProps) {
 
   const { status, channel, canSend } = mesh;
   const nodes = new Map(mesh.nodes.map((node) => [node.num, node]));
-  const messages = mesh.messages.slice(-maxMessages);
+  // Sends only ever leave on the home channel, so the composer lives on its tab.
+  const onHomeTab = active === channel;
 
   const submit = async (event: FormEvent): Promise<void> => {
     event.preventDefault();
@@ -97,9 +107,26 @@ export function MeshPanel({ title, mesh, maxMessages = 20 }: MeshPanelProps) {
         </span>
       }
     >
+      {channels.length > 1 ? (
+        <div className="mesh__tabs" role="tablist" aria-label="Mesh channels">
+          {channels.map((name) => (
+            <button
+              key={name}
+              type="button"
+              role="tab"
+              aria-selected={name === active}
+              className={name === active ? 'mesh__tab mesh__tab--active' : 'mesh__tab'}
+              onClick={() => setPicked(name)}
+            >
+              {name}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
       {messages.length === 0 ? (
         <p className="empty">
-          Nothing heard on <code>{channel}</code> yet. Messages appear here as nodes talk.
+          Nothing heard on <code>{active}</code> yet. Messages appear here as nodes talk.
         </p>
       ) : (
         <ul className="mesh__feed" ref={feedRef}>
@@ -118,37 +145,41 @@ export function MeshPanel({ title, mesh, maxMessages = 20 }: MeshPanelProps) {
         </ul>
       )}
 
-      <form className="mesh__send" onSubmit={(event) => void submit(event)}>
-        <input
-          type="text"
-          value={draft}
-          maxLength={TEXT_MAX_BYTES}
-          placeholder={canSend ? `Message ${channel}` : 'Sending unavailable'}
-          disabled={!canSend || busy}
-          onChange={(event) => setDraft(event.target.value)}
-          aria-label={`Message the ${channel} channel`}
-        />
-        <button type="submit" className="toggle" disabled={!canSend || busy || draft.trim().length === 0}>
-          {busy ? 'Sending…' : 'Send'}
-        </button>
-      </form>
+      {onHomeTab ? (
+        <form className="mesh__send" onSubmit={(event) => void submit(event)}>
+          <input
+            type="text"
+            value={draft}
+            maxLength={TEXT_MAX_BYTES}
+            placeholder={canSend ? `Message ${channel}` : 'Sending unavailable'}
+            disabled={!canSend || busy}
+            onChange={(event) => setDraft(event.target.value)}
+            aria-label={`Message the ${channel} channel`}
+          />
+          <button type="submit" className="toggle" disabled={!canSend || busy || draft.trim().length === 0}>
+            {busy ? 'Sending…' : 'Send'}
+          </button>
+        </form>
+      ) : null}
       {error ? <p className="empty text-alert">{error}</p> : null}
-      {!canSend && status.connected ? (
+      {onHomeTab && !canSend && status.connected ? (
         <p className="empty">
           Read-only: set MESH_GATEWAY_NODE and MESH_CHANNEL_INDEX in <code>.env</code> to enable sending.
         </p>
       ) : null}
 
       {mesh.nodes.length > 0 ? (
-        <ul className="rows rows--tight mesh__nodes">
-          {mesh.nodes.map((node) => (
-            <li key={node.num} className="row">
-              <span className="row__label">{nodeLabel(node)}</span>
-              <span className="row__value">{nodeMeta(node) || '—'}</span>
-              <span className="row__meta">{lastHeard(node)}</span>
-            </li>
-          ))}
-        </ul>
+        <Collapsible label={`${mesh.nodes.length} ${mesh.nodes.length === 1 ? 'node' : 'nodes'}`}>
+          <ul className="rows rows--tight mesh__nodes">
+            {mesh.nodes.map((node) => (
+              <li key={node.num} className="row">
+                <span className="row__label">{nodeLabel(node)}</span>
+                <span className="row__value">{nodeMeta(node) || '—'}</span>
+                <span className="row__meta">{lastHeard(node)}</span>
+              </li>
+            ))}
+          </ul>
+        </Collapsible>
       ) : null}
     </Panel>
   );

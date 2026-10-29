@@ -28,6 +28,8 @@ export interface MeshMessage {
   /** 4294967295 (broadcast) unless it was a DM. */
   to: number;
   channel: number;
+  /** Channel NAME from the uplink topic - the key the feed tabs filter on. */
+  channelName: string;
   text: string;
   /** Epoch seconds. Nodes without time sync send 0; we substitute receive time. */
   timestamp: number;
@@ -60,8 +62,15 @@ export interface MeshStatus {
 export interface MeshSummary {
   status: MeshStatus;
   channel: string;
+  /**
+   * Every channel heard on the uplink (any frame type, not just texts), other
+   * channels first (alphabetical) and the home channel last - the mesh's
+   * shared channel is the headline, ours is the one you tab over to. Always
+   * contains `channel`.
+   */
+  channels: string[];
   canSend: boolean;
-  /** Oldest first, capped at MESSAGE_CAP. */
+  /** Oldest first, capped at MESSAGE_CAP per channel. */
   messages: MeshMessage[];
   /** Sorted by lastHeard, newest first. */
   nodes: MeshNode[];
@@ -100,7 +109,13 @@ export class MeshClient {
 
   #client: MqttClient | null = null;
   #listeners = new Set<() => void>();
-  #messages: MeshMessage[] = [];
+  /** Per-channel buffers so a busy public channel cannot evict the home one. */
+  #messages = new Map<string, MeshMessage[]>();
+  /**
+   * Channels heard on ANY uplink frame, not just texts - telemetry is constant
+   * while texts are rare, so this is what makes a channel's tab appear promptly.
+   */
+  #channelsSeen = new Set<string>();
   #nodes = new Map<number, MeshNode>();
   #status: MeshStatus = { connected: false, gatewayOnline: null, lastError: null };
   /** Dashboard-sent messages need ids too; the envelope ids are positive, so count down. */
@@ -170,11 +185,14 @@ export class MeshClient {
   }
 
   summary(): MeshSummary {
+    const home = this.#config.channel;
+    const others = [...this.#channelsSeen].filter((name) => name !== home).sort();
     return {
       status: this.status,
-      channel: this.#config.channel,
+      channel: home,
+      channels: [...others, home],
       canSend: this.canSend,
-      messages: [...this.#messages],
+      messages: [...this.#messages.values()].flat().sort((a, b) => a.timestamp - b.timestamp),
       nodes: [...this.#nodes.values()].sort((a, b) => b.lastHeard - a.lastHeard),
     };
   }
@@ -201,6 +219,7 @@ export class MeshClient {
       from: 0,
       to: 4_294_967_295,
       channel: channelIndex,
+      channelName: this.#config.channel,
       text,
       timestamp: nowSeconds(),
       viaDashboard: true,
@@ -227,12 +246,17 @@ export class MeshClient {
     if (typeof envelope.from !== 'number') return;
 
     // Topic shape: <root>/2/json/<channelname>/<!gatewayid>
-    const channelName = topic.slice(this.#jsonPrefix.length).split('/')[0];
+    const channelName = topic.slice(this.#jsonPrefix.length).split('/')[0] ?? '';
     const timestamp = numberOr(envelope.timestamp, 0) || nowSeconds();
+
+    // The downlink topic sits under the json prefix too (`.../json/mqtt/`), so
+    // our own publishes echo back with 'mqtt' (or nothing) as the "channel".
+    const realChannel = channelName.length > 0 && channelName !== 'mqtt';
+    if (realChannel) this.#channelsSeen.add(channelName);
 
     this.#upsertNode(envelope, timestamp);
 
-    if (envelope.type === 'text' && channelName === this.#config.channel) {
+    if (envelope.type === 'text' && realChannel) {
       const text = stringOrNull(envelope.payload?.['text']);
       if (text === null) return;
       const packetId = numberOr(envelope.id, 0);
@@ -254,7 +278,7 @@ export class MeshClient {
       // radio's copy or every dashboard message shows twice.
       if (
         envelope.from === this.#config.gatewayNode &&
-        this.#messages.some(
+        (this.#messages.get(this.#config.channel) ?? []).some(
           (m) => m.viaDashboard && m.text === text && Math.abs(timestamp - m.timestamp) < 60,
         )
       ) {
@@ -266,6 +290,7 @@ export class MeshClient {
         from: envelope.from,
         to: numberOr(envelope.to, 4_294_967_295),
         channel: numberOr(envelope.channel, 0),
+        channelName,
         text,
         timestamp,
         viaDashboard: false,
@@ -308,8 +333,10 @@ export class MeshClient {
   }
 
   #pushMessage(message: MeshMessage): void {
-    this.#messages.push(message);
-    if (this.#messages.length > MESSAGE_CAP) this.#messages.splice(0, this.#messages.length - MESSAGE_CAP);
+    const buffer = this.#messages.get(message.channelName) ?? [];
+    buffer.push(message);
+    if (buffer.length > MESSAGE_CAP) buffer.splice(0, buffer.length - MESSAGE_CAP);
+    this.#messages.set(message.channelName, buffer);
     this.#emit();
   }
 
