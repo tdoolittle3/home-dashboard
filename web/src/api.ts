@@ -33,11 +33,11 @@ export async function sendAction(entityId: string, action: ControlAction): Promi
   }
 }
 
-export async function sendMeshText(text: string): Promise<void> {
+export async function sendMeshText(text: string, channel: string): Promise<void> {
   const response = await fetch('/api/mesh/send', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ text }),
+    body: JSON.stringify({ text, channel }),
   });
   if (!response.ok) {
     const body = (await response.json().catch(() => null)) as { error?: string } | null;

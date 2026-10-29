@@ -372,7 +372,8 @@ export interface MeshSummary {
   channel: string;
   /** Every channel heard on the uplink, home channel last. Always non-empty. */
   channels: string[];
-  canSend: boolean;
+  /** The subset of `channels` sends can go out on (TX index known + gateway configured). */
+  sendable: string[];
   /** Oldest first. */
   messages: MeshMessage[];
   /** Newest heard first. */
