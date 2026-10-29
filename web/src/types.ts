@@ -336,6 +336,8 @@ export interface MeshMessage {
   /** 4294967295 (broadcast) unless it was a DM. */
   to: number;
   channel: number;
+  /** Channel NAME from the uplink topic - the key the feed tabs filter on. */
+  channelName: string;
   /** Epoch seconds. */
   timestamp: number;
   text: string;
@@ -366,7 +368,10 @@ export interface MeshStatus {
 
 export interface MeshSummary {
   status: MeshStatus;
+  /** The home channel - the one sends go out on. */
   channel: string;
+  /** Every channel heard on the uplink, home channel last. Always non-empty. */
+  channels: string[];
   canSend: boolean;
   /** Oldest first. */
   messages: MeshMessage[];

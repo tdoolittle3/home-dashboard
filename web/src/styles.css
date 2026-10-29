@@ -2146,7 +2146,41 @@ body {
 }
 
 
-/* --- mesh panel: chat feed, send box, node roster --- */
+/* --- mesh panel: channel tabs, chat feed, send box, node roster --- */
+
+.mesh__tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.mesh__tab {
+  font: inherit;
+  font-size: var(--fs-sm);
+  color: var(--text-dim);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px 14px;
+  cursor: pointer;
+  transition: border-color var(--motion-fast) var(--ease), color var(--motion-fast) var(--ease);
+}
+
+.mesh__tab:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.mesh__tab:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.mesh__tab--active {
+  color: var(--text);
+  background: var(--surface-raised);
+  border-color: var(--accent);
+}
 
 .mesh__feed {
   list-style: none;
