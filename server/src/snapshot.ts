@@ -50,6 +50,8 @@ export interface Snapshot {
    * beside `sources` rather than inside it. Null when MESH_MQTT_URL is unset.
    */
   mesh: MeshSummary | null;
+  /** True when HOST_RESTART is on, so the footer shows its restart button. */
+  hostRestart: boolean;
 }
 
 function attr(state: HassState, key: string): string | null {
@@ -161,6 +163,7 @@ export class SnapshotBuilder {
       entities: this.entities(),
       sources: await this.sources(),
       mesh: this.#mesh?.summary() ?? null,
+      hostRestart: this.#config.hostRestart !== null,
     };
   }
 }

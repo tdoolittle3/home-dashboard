@@ -45,6 +45,19 @@ export async function sendMeshText(text: string, channel: string): Promise<void>
   }
 }
 
+/** Reboots the machine the dashboard runs on. Resolves once the server has started the reboot. */
+export async function restartHost(): Promise<void> {
+  const response = await fetch('/api/host/restart', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ confirm: 'restart' }),
+  });
+  if (!response.ok) {
+    const body = (await response.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(body?.error ?? `restart failed: ${response.status}`);
+  }
+}
+
 export interface StreamHandlers {
   onSnapshot: (snapshot: Snapshot) => void;
   onEntity: (entity: EntitySnapshot) => void;

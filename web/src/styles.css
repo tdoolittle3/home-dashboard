@@ -2622,3 +2622,64 @@ body {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+
+/* --- restart footer --- */
+
+.footer {
+  margin-top: 40px;
+  display: flex;
+  justify-content: center;
+}
+
+.footer__restart:hover:not(:disabled) {
+  color: var(--down);
+  border-color: var(--down);
+}
+
+.confirm {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: var(--scrim);
+  animation: fade var(--motion-fast) var(--ease) both;
+}
+
+.confirm__box {
+  width: min(420px, 100%);
+  padding: 22px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-panel);
+}
+
+.confirm__title {
+  margin: 0 0 8px;
+  font-size: var(--fs-xl);
+}
+
+.confirm__text {
+  margin: 0 0 18px;
+  color: var(--text-dim);
+  font-size: var(--fs-md);
+  line-height: 1.5;
+}
+
+.confirm__error {
+  margin: -6px 0 14px;
+  font-size: var(--fs-sm);
+}
+
+.confirm__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.confirm__danger {
+  color: var(--down);
+  border-color: var(--down);
+}

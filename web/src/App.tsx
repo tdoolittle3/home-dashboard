@@ -11,6 +11,7 @@ import { MediaPanel } from './components/MediaPanel';
 import { MicFab } from './components/MicFab';
 import { MeshPanel } from './components/MeshPanel';
 import { PhotosPanel } from './components/PhotosPanel';
+import { RestartFooter } from './components/RestartFooter';
 import { ServicesPanel } from './components/ServicesPanel';
 import { StoragePanel } from './components/StoragePanel';
 import { SystemPanel } from './components/SystemPanel';
@@ -56,7 +57,7 @@ export function App() {
     );
   }
 
-  const { dashboard, entities, sources, ha, mesh } = snapshot;
+  const { dashboard, entities, sources, ha, mesh, hostRestart } = snapshot;
 
   // Cameras lead the page in a full-width row of their own. Below it, on a
   // phone, the side stack (controls, then services) comes first so the switches
@@ -214,6 +215,8 @@ export function App() {
           {mainPanels.length > 0 ? <div className="layout__main">{mainPanels.map(renderPanel)}</div> : null}
         </div>
       )}
+
+      {hostRestart ? <RestartFooter hostName="ladybird" /> : null}
     </main>
   );
 }
