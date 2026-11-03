@@ -220,6 +220,26 @@ tar -xf /tmp/hd.tar -C ~/src/home-dashboard
 cd /opt/stacks/dash && docker compose up -d --build
 ```
 
+**From CI:** [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml) does exactly the above on
+every push to `main` (and on manual dispatch). A `verify` job typechecks and builds on a
+GitHub-hosted runner; the `deploy` job, gated by the `prod` environment, joins the tailnet as an
+ephemeral `tag:ci` node (same mechanism as `home-automation`'s deploy), ships `git archive` over SSH
+to ladybird's Tailscale IP, swaps `~/src/home-dashboard` (previous tree kept as `.prev`), runs
+`docker compose up -d --build`, then waits for the container to be `healthy` and compares the served
+JS bundle name with the CI build.
+
+One-time setup, in this repo's `prod` environment (Settings → Environments; add a required reviewer
+and restrict deployments to `main`):
+
+| Secret | Value |
+|---|---|
+| `TS_AUTHKEY` | a pre-signed ephemeral `tag:ci` auth key — the same kind `home-automation` uses (expires every 90 days; renew with `tailscale lock sign` on ladybird) |
+| `DEPLOY_SSH_KEY` | private half of the dedicated CI deploy key already in `thomas@ladybird:~/.ssh/authorized_keys` |
+
+No tailnet policy change is needed: `tag:ci` is already allowed tcp/22 to ladybird. The secrets are
+per-repo, so they must be copied here from wherever they were generated — `home-automation`'s
+environment secrets can't be read back.
+
 Nothing runs from the source directory — the host has no Node installed at all. Deleting the
 checkout does not stop the container; it only prevents the next rebuild.
 
