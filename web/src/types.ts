@@ -388,6 +388,8 @@ export interface Snapshot {
   sources: SourcesSnapshot;
   /** Null when the server has no MESH_MQTT_URL configured. */
   mesh: MeshSummary | null;
+  /** True when the server was started with HOST_RESTART=1. */
+  hostRestart: boolean;
 }
 
 export type ControlAction = 'turn_on' | 'turn_off' | 'toggle';

@@ -199,6 +199,13 @@ export interface AppConfig {
   llamaSwap: { baseUrl: string; apiKey: string; uiBaseUrl: string } | null;
   /** whisper.cpp server for the assistant's mic button (stacks/stt on ladybird). */
   stt: { baseUrl: string } | null;
+  /**
+   * The footer's "Restart ladybird" button. Off unless HOST_RESTART=1: the
+   * server then drives the Docker socket (mounted into the container) to run a
+   * one-shot privileged container that reboots the host, so enabling it hands
+   * this app root-equivalent reach over the machine. `image` needs nsenter.
+   */
+  hostRestart: { socketPath: string; image: string } | null;
   /** tar1090 instance the /adsb/* relay dials. Derived from the 'adsb' panel's baseHost. */
   adsb: { baseUrl: string } | null;
   /**
@@ -546,6 +553,13 @@ export function loadConfig(): AppConfig {
         : null,
     stt: sttBase ? { baseUrl: stripTrailingSlash(sttBase) } : null,
     adsb: adsbHost ? { baseUrl: `http://${adsbHost}` } : null,
+    hostRestart:
+      optional('HOST_RESTART') === '1'
+        ? {
+            socketPath: optional('DOCKER_SOCKET') ?? '/var/run/docker.sock',
+            image: optional('HOST_RESTART_IMAGE') ?? 'debian:trixie',
+          }
+        : null,
     mesh: loadMesh(),
     sourceTtlMs: num('SOURCE_TTL_SECONDS', 10) * 1000,
     sourcePushMs: num('SOURCE_PUSH_SECONDS', 15) * 1000,
