@@ -1,0 +1,132 @@
+name: Deploy to ladybird
+
+# Builds the dashboard image on ladybird from this commit, same as the manual
+# runbook in the README ("Deploying to ladybird"), but from CI.
+#
+# Network path mirrors home-automation's deploy.yml: the runner joins the
+# tailnet as an ephemeral tag:ci node (pre-signed auth key, tailnet lock) and
+# reaches ladybird node-to-node at its Tailscale IP over tcp/22. The tag:ci
+# ACL already allows exactly that; nothing else is exposed.
+#
+# Secrets live in the `prod` environment of THIS repo (required reviewer +
+# main-only deployments recommended) — see "One-time setup" in the README.
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "**.md"
+      - ".github/workflows/ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# One deploy at a time; never cancel a deploy that is mid-swap.
+concurrency:
+  group: deploy
+  cancel-in-progress: false
+
+env:
+  # ladybird's Tailscale IP (same value as home-automation's
+  # ansible/inventory-tailnet.yml — update both if the node is re-registered).
+  LADYBIRD_TS_IP: 100.69.144.83
+  LADYBIRD_USER: thomas
+
+jobs:
+  verify:
+    name: typecheck + build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    outputs:
+      bundle: ${{ steps.bundle.outputs.name }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
+      - name: Record expected JS bundle name
+        id: bundle
+        run: |
+          f=$(ls web/dist/assets/index-*.js | head -n1)
+          echo "name=$(basename "$f")" >> "$GITHUB_OUTPUT"
+
+  deploy:
+    name: deploy
+    needs: verify
+    runs-on: ubuntu-latest
+    environment: prod
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Join tailnet (ephemeral tag:ci node)
+        uses: tailscale/github-action@6cae46e2d796f265265cfcf628b72a32b4d7cade # v3
+        with:
+          authkey: ${{ secrets.TS_AUTHKEY }}
+
+      - name: Set up SSH
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/ci_deploy && chmod 600 ~/.ssh/ci_deploy
+          cat > ~/.ssh/config <<CFG
+          Host ladybird
+            HostName $LADYBIRD_TS_IP
+            User $LADYBIRD_USER
+            IdentityFile ~/.ssh/ci_deploy
+            IdentitiesOnly yes
+            StrictHostKeyChecking accept-new
+            ServerAliveInterval 15
+          CFG
+          sed -i 's/^ *//' ~/.ssh/config
+          chmod 600 ~/.ssh/config
+
+      - name: Ship source
+        run: |
+          git archive --format=tar HEAD > hd.tar
+          scp hd.tar ladybird:/tmp/hd.tar
+
+      - name: Swap source and rebuild
+        run: |
+          ssh ladybird 'bash -se' <<'REMOTE'
+          set -euo pipefail
+          # Extract next to the live dir first so a bad tar never leaves
+          # ~/src/home-dashboard empty; keep the previous tree for one deploy.
+          rm -rf ~/src/home-dashboard.new
+          mkdir -p ~/src/home-dashboard.new
+          tar -xf /tmp/hd.tar -C ~/src/home-dashboard.new
+          rm -rf ~/src/home-dashboard.prev
+          [ -d ~/src/home-dashboard ] && mv ~/src/home-dashboard ~/src/home-dashboard.prev
+          mv ~/src/home-dashboard.new ~/src/home-dashboard
+          rm -f /tmp/hd.tar
+          cd /opt/stacks/dash && docker compose up -d --build
+          REMOTE
+
+      - name: Verify health and served bundle
+        env:
+          EXPECTED_BUNDLE: ${{ needs.verify.outputs.bundle }}
+        run: |
+          ssh ladybird 'bash -se' "$EXPECTED_BUNDLE" <<'REMOTE'
+          set -uo pipefail
+          expected="$1"
+          for i in $(seq 1 30); do
+            s=$(docker inspect -f '{{.State.Health.Status}}' home-dashboard 2>/dev/null || echo missing)
+            [ "$s" = healthy ] && break
+            sleep 2
+          done
+          echo "container health: $s"
+          [ "$s" = healthy ] || { docker logs --tail 40 home-dashboard; exit 1; }
+          curl -fsS http://127.0.0.1/api/health; echo
+          served=$(curl -fsS http://127.0.0.1/ | grep -o 'index-[A-Za-z0-9_-]*\.js' | head -n1)
+          echo "served bundle:   $served"
+          echo "expected bundle: $expected"
+          # Vite hashes can differ between the CI build and the Docker build
+          # if toolchain versions drift, so a mismatch warns rather than fails;
+          # a stale image still fails above (compose build error / unhealthy).
+          [ "$served" = "$expected" ] || echo "::warning::served bundle differs from CI build ($served vs $expected)"
+          REMOTE
