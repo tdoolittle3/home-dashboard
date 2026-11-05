@@ -68,27 +68,51 @@ export interface StreamHandlers {
   onError: () => void;
 }
 
-/** EventSource handles its own reconnect, so there is no retry logic here. */
-export function openStream(handlers: StreamHandlers): () => void {
-  const source = new EventSource('/api/stream');
+const STREAM_RETRY_MS = 3_000;
 
-  const listen = <T>(event: string, handler: (payload: T) => void): void => {
-    source.addEventListener(event, (message) => {
-      try {
-        handler(JSON.parse((message as MessageEvent<string>).data) as T);
-      } catch {
-        // A malformed frame is not worth tearing the stream down for.
+/**
+ * EventSource retries dropped connections itself, but gives up for good (readyState
+ * CLOSED) when the server answers with an error status - e.g. a 502 from the proxy
+ * mid-deploy. In that case reopen it by hand after a short delay.
+ */
+export function openStream(handlers: StreamHandlers): () => void {
+  let source: EventSource | null = null;
+  let retry: number | undefined;
+  let stopped = false;
+
+  const connect = (): void => {
+    const next = new EventSource('/api/stream');
+    source = next;
+
+    const listen = <T>(event: string, handler: (payload: T) => void): void => {
+      next.addEventListener(event, (message) => {
+        try {
+          handler(JSON.parse((message as MessageEvent<string>).data) as T);
+        } catch {
+          // A malformed frame is not worth tearing the stream down for.
+        }
+      });
+    };
+
+    next.addEventListener('open', handlers.onOpen);
+    next.addEventListener('error', () => {
+      handlers.onError();
+      if (!stopped && next.readyState === EventSource.CLOSED) {
+        retry = window.setTimeout(connect, STREAM_RETRY_MS);
       }
     });
+    listen<Snapshot>('snapshot', handlers.onSnapshot);
+    listen<EntitySnapshot>('state', handlers.onEntity);
+    listen<HaStatus>('ha', handlers.onHaStatus);
+    listen<SourcesSnapshot>('sources', handlers.onSources);
+    listen<MeshSummary>('mesh', handlers.onMesh);
   };
 
-  source.addEventListener('open', handlers.onOpen);
-  source.addEventListener('error', handlers.onError);
-  listen<Snapshot>('snapshot', handlers.onSnapshot);
-  listen<EntitySnapshot>('state', handlers.onEntity);
-  listen<HaStatus>('ha', handlers.onHaStatus);
-  listen<SourcesSnapshot>('sources', handlers.onSources);
-  listen<MeshSummary>('mesh', handlers.onMesh);
+  connect();
 
-  return () => source.close();
+  return () => {
+    stopped = true;
+    window.clearTimeout(retry);
+    source?.close();
+  };
 }

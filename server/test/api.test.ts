@@ -173,8 +173,10 @@ describe('api routes', () => {
     it('rejects event ids outside the id alphabet before any upstream call', async () => {
       const fetchSpy = vi.spyOn(globalThis, 'fetch');
       await start(makeConfig({ frigate: FRIGATE }));
-      const res = await app.inject({ url: '/api/events/a%20b/snapshot.jpg' });
-      expect(res.statusCode).toBe(404);
+      for (const id of ['a%20b', '%2E%2E', '%2E']) {
+        const res = await app.inject({ url: `/api/events/${id}/snapshot.jpg` });
+        expect(res.statusCode, id).toBe(404);
+      }
       expect(fetchSpy).not.toHaveBeenCalled();
     });
 

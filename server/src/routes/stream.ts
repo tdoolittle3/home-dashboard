@@ -40,7 +40,10 @@ export function registerStreamRoute(
       response.write(`event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`);
     };
 
-    void snapshots.build().then((snapshot) => send('snapshot', snapshot));
+    snapshots
+      .build()
+      .then((snapshot) => send('snapshot', snapshot))
+      .catch((error: unknown) => request.log.warn({ err: String(error) }, 'initial snapshot failed'));
 
     const offState = ha.addStateListener((entityId, state) => {
       if (!watched.has(entityId)) return;
@@ -63,7 +66,10 @@ export function registerStreamRoute(
       : null;
 
     const sourceTimer = setInterval(() => {
-      void snapshots.sources().then((sources) => send('sources', sources));
+      snapshots
+        .sources()
+        .then((sources) => send('sources', sources))
+        .catch((error: unknown) => request.log.warn({ err: String(error) }, 'sources push failed'));
     }, config.sourcePushMs);
 
     const heartbeat = setInterval(() => {

@@ -114,7 +114,8 @@ export class HaClient {
   // --- connection lifecycle ---
 
   #open(): void {
-    const ws = new WebSocket(this.#wsUrl);
+    // Without a handshake timeout a black-holed TCP connect hangs and the reconnect loop never fires.
+    const ws = new WebSocket(this.#wsUrl, { handshakeTimeout: 10_000 });
     this.#ws = ws;
 
     ws.on('message', (raw) => this.#onMessage(raw));
