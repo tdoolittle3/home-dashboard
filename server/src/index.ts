@@ -27,7 +27,11 @@ function resolveWebDist(): string | null {
 
 async function main(): Promise<void> {
   const config = loadConfig();
-  const app = Fastify({ logger: { level: process.env['LOG_LEVEL']?.trim() || 'info' } });
+  const app = Fastify({
+    logger: { level: process.env['LOG_LEVEL']?.trim() || 'info' },
+    // Hijacked SSE/MJPEG responses never go idle, so without this app.close() waits on them forever.
+    forceCloseConnections: true,
+  });
 
   const ha = new HaClient(config.ha.baseUrl, config.ha.token, (message, extra) => {
     if (extra === undefined) app.log.info(message);
@@ -54,7 +58,9 @@ async function main(): Promise<void> {
     await app.register(fastifyStatic, { root: webDist, prefix: '/' });
     // Client-side routing: anything that is not an API call falls back to the app shell.
     app.setNotFoundHandler((request, reply) => {
-      if (request.url.startsWith('/api/')) {
+      // A missing API call or build asset must 404, not come back as HTML a script then fails to parse.
+      const path = request.url.split('?')[0] ?? '';
+      if (path.startsWith('/api/') || path.startsWith('/assets/') || (request.method !== 'GET' && request.method !== 'HEAD')) {
         return reply.code(404).send({ error: 'not found' });
       }
       return reply.sendFile('index.html');

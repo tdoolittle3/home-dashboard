@@ -391,7 +391,8 @@ export function registerApiRoutes(
    * nginx streams clips chunked with no range support, and iPhone Safari will
    * not play an MP4 from a server that cannot serve ranges.
    */
-  const EVENT_ID = /^[\w.-]+$/;
+  // Frigate ids look like 1700000000.123-abc123; reject dot-only ids such as ".." outright.
+  const EVENT_ID = /^(?!\.+$)[\w.-]+$/;
 
   /**
    * Guards both event media routes; null means the reply was already sent.
