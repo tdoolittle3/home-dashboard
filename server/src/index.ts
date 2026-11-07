@@ -15,6 +15,11 @@ import { SnapshotBuilder } from './snapshot.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 
+// Served in place of a deleted hashed bundle. The sessionStorage flag stops a reload loop if the reload still
+// can't find a bundle (a genuinely broken deploy).
+const STALE_BUNDLE_RELOAD =
+  "try{if(!sessionStorage.getItem('bundle-reloaded')){sessionStorage.setItem('bundle-reloaded','1');location.reload();}}catch(e){}";
+
 function resolveWebDist(): string | null {
   const configured = process.env['WEB_DIST']?.trim();
   const candidates = configured ? [configured] : [join(here, '..', '..', 'web', 'dist')];
@@ -55,15 +60,34 @@ async function main(): Promise<void> {
 
   const webDist = resolveWebDist();
   if (webDist) {
-    await app.register(fastifyStatic, { root: webDist, prefix: '/' });
+    await app.register(fastifyStatic, {
+      root: webDist,
+      prefix: '/',
+      // Hashed build assets never change, so they cache forever. Everything else (index.html above all) must
+      // revalidate, or a phone keeps an old shell pointing at a bundle the last deploy deleted: a blank page.
+      setHeaders: (res, filePath) => {
+        const hashed = /[\\/]assets[\\/]/.test(filePath);
+        res.setHeader('Cache-Control', hashed ? 'public, max-age=31536000, immutable' : 'no-store');
+      },
+    });
     // Client-side routing: anything that is not an API call falls back to the app shell.
     app.setNotFoundHandler((request, reply) => {
-      // A missing API call or build asset must 404, not come back as HTML a script then fails to parse.
       const path = request.url.split('?')[0] ?? '';
-      if (path.startsWith('/api/') || path.startsWith('/assets/') || (request.method !== 'GET' && request.method !== 'HEAD')) {
+      const readOnly = request.method === 'GET' || request.method === 'HEAD';
+      // A stale cached shell asks for a bundle a deploy removed. A 404 leaves it blank, so answer with a tiny
+      // script that reloads once; the reload fetches the fresh index.html (served no-store).
+      if (readOnly && path.startsWith('/assets/') && path.endsWith('.js')) {
+        return reply
+          .code(200)
+          .header('Cache-Control', 'no-store')
+          .type('application/javascript')
+          .send(STALE_BUNDLE_RELOAD);
+      }
+      // A missing API call or build asset must 404, not come back as HTML a script then fails to parse.
+      if (path.startsWith('/api/') || path.startsWith('/assets/') || !readOnly) {
         return reply.code(404).send({ error: 'not found' });
       }
-      return reply.sendFile('index.html');
+      return reply.header('Cache-Control', 'no-store').sendFile('index.html');
     });
     app.log.info(`Serving the frontend from ${webDist}`);
   } else {
