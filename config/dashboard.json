@@ -157,7 +157,6 @@
     { "label": "Uptime Kuma", "url": "http://ladybird.tail0e6756.ts.net:3001", "service": "uptimeKuma", "group": "Home" },
     { "label": "Jellyfin", "url": "http://ladybird.tail0e6756.ts.net:8096", "service": "jellyfin", "group": "Media" },
     { "label": "Immich", "url": "http://ladybird.tail0e6756.ts.net:2283", "service": "immich", "group": "Media" },
-    { "label": "TV Guide", "url": "http://ladybird.tail0e6756.ts.net:3000", "health": "http://192.168.0.13:3000/", "icon": "tv", "group": "Media" },
     { "label": "Hermes", "url": "https://ladybird.tail0e6756.ts.net:9119", "health": "https://ladybird.tail0e6756.ts.net:9119/", "resolve": "100.69.144.83", "icon": "bot", "group": "Apps" },
     { "label": "Hermes Reports", "url": "https://ladybird.tail0e6756.ts.net:9123", "health": "https://ladybird.tail0e6756.ts.net:9123/", "resolve": "100.69.144.83", "icon": "report", "group": "Apps" },
     { "label": "Vaultwarden", "url": "https://ladybird.tail0e6756.ts.net:8443", "health": "http://192.168.0.13:8222/alive", "icon": "key", "group": "Apps" },
