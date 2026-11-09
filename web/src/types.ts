@@ -122,6 +122,12 @@ export interface ServiceLink {
   url: string;
   service?: TileService;
   health?: string;
+  /** Server-side only: IP the health ping dials in place of DNS (tailnet names don't resolve in the container). */
+  resolve?: string;
+  /** Services panel section this tile sits under; sections keep config order. Absent = the leading, unlabelled section. */
+  group?: string;
+  /** Tile glyph, one of TileIcon's names; unknown names fall back to the generic link glyph. */
+  icon?: string;
 }
 
 /** The outdoor pair the topbar shows instead of the "updated ..." label. Mirrors OutdoorRefs in server/src/config.ts. */

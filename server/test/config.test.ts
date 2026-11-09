@@ -86,6 +86,23 @@ describe('loadConfig', () => {
     expect(() => load({ panels: [] })).toThrow(/HA_TOKEN is required/);
   });
 
+  it('accepts a link with group, icon and a resolve-pinned health url', () => {
+    const config = load({
+      panels: [],
+      links: [
+        {
+          label: 'Hermes',
+          url: 'https://x.ts.net:9119',
+          health: 'https://x.ts.net:9119/',
+          resolve: '100.64.0.1',
+          group: 'Apps',
+          icon: 'bot',
+        },
+      ],
+    });
+    expect(config.dashboard.links[0]).toMatchObject({ resolve: '100.64.0.1', group: 'Apps', icon: 'bot' });
+  });
+
   const invalid: [string, unknown, RegExp][] = [
     [
       'duplicate panel ids',
@@ -127,6 +144,24 @@ describe('loadConfig', () => {
       'a non-http link',
       { panels: [], links: [{ label: 'x', url: 'javascript:alert(1)' }] },
       /http\(s\)/,
+    ],
+    [
+      'a link resolve without a health url',
+      { panels: [], links: [{ label: 'x', url: 'http://x.ts.net', resolve: '100.64.0.1' }] },
+      /no "health" url/,
+    ],
+    [
+      'a link resolve that is not an IP',
+      {
+        panels: [],
+        links: [{ label: 'x', url: 'http://x.ts.net', health: 'http://x.ts.net/', resolve: 'evil.example' }],
+      },
+      /not an IP/,
+    ],
+    [
+      'a link with an empty group',
+      { panels: [], links: [{ label: 'x', url: 'http://x.ts.net', group: ' ' }] },
+      /empty "group"/,
     ],
     [
       'a system metric with warn above crit',

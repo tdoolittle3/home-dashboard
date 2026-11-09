@@ -534,6 +534,22 @@ body {
 
 /* --- service tiles --- */
 
+/* A labelled slice of the Services panel: small dim heading, then its tiles.
+   The first section starts flush with the panel body; labels separate the
+   rest without drawing a rule - the whitespace and the caps do the work. */
+.tilegroup + .tilegroup {
+  margin-top: 16px;
+}
+
+.tilegroup__name {
+  margin: 0 0 8px;
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+}
+
 .tiles {
   display: grid;
   gap: 10px;
@@ -612,28 +628,51 @@ body {
   gap: 9px;
 }
 
+/* The glyph chip anchors the tile; the status dot rides its corner like a
+   presence badge, ringed in the tile's own fill so it reads as sitting on
+   top of the chip rather than beside it. No badge = not watched. */
+.tile__glyph {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  flex: none;
+  border-radius: var(--radius-xs);
+  background: var(--surface-hover);
+  color: var(--text-dim);
+  transition: color var(--motion-fast) var(--ease);
+}
+
+.tile--link:hover .tile__glyph,
+.tile--link:focus-visible .tile__glyph {
+  color: var(--text);
+}
+
+.tile--idle .tile__glyph {
+  background: color-mix(in srgb, var(--surface-hover) 55%, transparent);
+}
+
 .tile__dot {
+  position: absolute;
+  right: -3px;
+  bottom: -3px;
   width: 8px;
   height: 8px;
   border-radius: 50%;
   background: var(--idle);
-  flex: none;
-}
-
-.tile__dot--idle {
-  background: transparent;
-  box-shadow: inset 0 0 0 1.5px var(--idle);
+  box-shadow: 0 0 0 2px var(--surface-raised);
 }
 
 .tile__dot--up {
   background: var(--up);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--up) 22%, transparent);
-  animation: halo 2.8s var(--ease) infinite;
 }
 
 .tile__dot--down {
   background: var(--down);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--down) 22%, transparent);
+  box-shadow:
+    0 0 0 2px var(--surface-raised),
+    0 0 6px 1px color-mix(in srgb, var(--down) 55%, transparent);
 }
 
 .tile__name {
@@ -1906,16 +1945,6 @@ body {
   }
 }
 
-@keyframes halo {
-  0%,
-  100% {
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--up) 22%, transparent);
-  }
-  50% {
-    box-shadow: 0 0 0 5px color-mix(in srgb, var(--up) 10%, transparent);
-  }
-}
-
 /* Every transition reads its duration from the two motion tokens, so zeroing
    them here stills the whole page; the looping and entrance animations are
    named explicitly. */
@@ -1928,7 +1957,6 @@ body {
   .panel,
   .viewer,
   .pill--live .pill__dot,
-  .tile__dot--up,
   .ups__banner--critical .ups__banner-title,
   .ups--critical .ups__gauge-fill,
   .health--outage .health__title,

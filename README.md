@@ -266,6 +266,16 @@ Frigate is linked on **5000**, its unauthenticated port, not the `8971` TLS port
 login. Both are published on the host, and 5000 is the same port the dashboard's own camera proxy
 already talks to — the link is no more exposure than the dashboard itself.
 
+A link's optional `group` names the Services panel section it sits under (sections keep config
+order) and `icon` picks the tile glyph from `web/src/components/TileIcon.tsx`. The `health` URL is
+what the server pings for the up/down dot — a LAN address, since the ping leaves from inside the
+container. Services published only through `tailscale serve` (Hermes on 9119, Hermes Reports on
+9123, Vaultwarden's HTTPS front door on 8443) bind loopback plus the host's Tailscale IP, so there
+is no LAN health target; their `health` keeps the ts.net hostname — TLS verifies against it — and
+`resolve` pins that hostname to the Tailscale IP, because the container has no tailnet DNS. Through
+that proxy a `502`/`503`/`504` answer means the backend is dead, so those three statuses turn the
+dot red where any other HTTP answer counts as up.
+
 ---
 
 ## Verified in the container on ladybird (2026-09-05)

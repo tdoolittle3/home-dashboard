@@ -146,6 +146,17 @@ export interface ServiceLink {
   url: string;
   service?: TileService;
   health?: string;
+  /**
+   * IP the `health` hostname is pinned to for the ping. The container has no
+   * DNS for tailnet names, but a service published only through `tailscale
+   * serve` is reachable at the host's Tailscale IP - and the ping has to carry
+   * the real hostname for TLS to verify, so a bare-IP health URL won't do.
+   */
+  resolve?: string;
+  /** Services panel section this tile sits under; sections keep config order. Absent = the leading, unlabelled section. */
+  group?: string;
+  /** Tile glyph, one of web/src/components/TileIcon.tsx's names. Unknown names fall back to the generic link glyph. */
+  icon?: string;
 }
 
 /** The outdoor pair the topbar shows instead of the "updated ..." label. */
@@ -437,6 +448,17 @@ function loadDashboard(path: string): DashboardConfig {
     }
     if (link.health !== undefined && !HTTP_URL.test(link.health)) {
       throw new Error(`${path}: link "${link.label}" has a non-http(s) "health" url`);
+    }
+    if (link.resolve !== undefined) {
+      if (link.health === undefined) {
+        throw new Error(`${path}: link "${link.label}" has "resolve" but no "health" url to pin it to`);
+      }
+      if (!/^[0-9a-fA-F.:]+$/.test(link.resolve)) {
+        throw new Error(`${path}: link "${link.label}" has a "resolve" that is not an IP address`);
+      }
+    }
+    if (link.group !== undefined && (typeof link.group !== 'string' || link.group.trim() === '')) {
+      throw new Error(`${path}: link "${link.label}" has an empty "group"`);
     }
   }
 
