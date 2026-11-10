@@ -162,6 +162,7 @@
     { "label": "Vaultwarden", "url": "https://ladybird.tail0e6756.ts.net:8443", "health": "http://192.168.0.13:8222/alive", "icon": "key", "group": "Apps" },
     { "label": "Portfolio Advisor", "url": "http://ladybird.tail0e6756.ts.net:8501", "health": "http://192.168.0.13:8501/", "icon": "chart", "group": "Apps" },
     { "label": "n8n", "url": "http://ladybird.tail0e6756.ts.net:5678", "health": "http://192.168.0.13:5678/", "icon": "flow", "group": "Apps" },
+    { "label": "Vision", "url": "http://snibbly.tail0e6756.ts.net:8099", "health": "http://192.168.0.19:8099/", "icon": "camera", "group": "Apps" },
     { "label": "Flights", "url": "http://ladybird.tail0e6756.ts.net:8080", "health": "http://192.168.0.13:8080/", "icon": "plane", "group": "Radio" },
     { "label": "rtl_433", "url": "http://ladybird.tail0e6756.ts.net:8433", "health": "http://192.168.0.13:8433/", "icon": "radio", "group": "Radio" }
   ]
