@@ -25,6 +25,8 @@ export interface HaStatus {
 export interface EntityRef {
   entity_id: string;
   name?: string;
+  /** Disk-chart panel only: draw this size sensor as a named wedge carved out of the used share instead of a text row. */
+  slice?: boolean;
 }
 
 export interface CameraRef {

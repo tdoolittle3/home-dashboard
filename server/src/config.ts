@@ -5,6 +5,12 @@ import 'dotenv/config';
 export interface EntityRef {
   entity_id: string;
   name?: string;
+  /**
+   * On the disk-chart panel: draw this size sensor as a named wedge carved out
+   * of the pie's used share instead of a text row. The sensor must report a
+   * plain number with a byte unit (MB/GB/TB...). Ignored elsewhere.
+   */
+  slice?: boolean;
 }
 
 export interface CameraRef {

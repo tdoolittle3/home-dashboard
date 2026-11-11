@@ -1,5 +1,5 @@
 import { formatMb, formatRelative, formatState, isProblem, labelFor } from '../format';
-import { splitStorage } from '../storage';
+import { splitStorage, toMb } from '../storage';
 import type { EntityRef, EntitySnapshot, SourceResult, FrigateSummary } from '../types';
 import { DiskPie } from './DiskPie';
 import { Panel } from './Panel';
@@ -25,6 +25,16 @@ interface StoragePanelProps {
 export function StoragePanel({ title, refs, entities, frigate }: StoragePanelProps) {
   const { disk, others } = frigate?.ok ? splitStorage(frigate.data.storage) : { disk: undefined, others: [] };
 
+  // slice refs become wedges of the pie; the rest stay text rows. A slice
+  // sensor with no pie to live in (Frigate down) or no readable size falls
+  // back to a row rather than silently vanishing from the panel.
+  const asWedge = (ref: EntityRef) => disk !== undefined && ref.slice === true && toMb(entities[ref.entity_id]) !== null;
+  const carve = refs.filter(asWedge).map((ref) => ({
+    label: labelFor(ref, entities[ref.entity_id]),
+    megabytes: toMb(entities[ref.entity_id]) as number,
+  }));
+  const rowRefs = refs.filter((ref) => !asWedge(ref));
+
   return (
     <Panel title={title}>
       <div className="storage">
@@ -37,6 +47,7 @@ export function StoragePanel({ title, refs, entities, frigate }: StoragePanelPro
                 totalMb={disk.totalMb}
                 usedMb={disk.usedMb}
                 freeMb={disk.freeMb}
+                carve={carve}
               />
             </div>
           ) : null}
@@ -44,7 +55,7 @@ export function StoragePanel({ title, refs, entities, frigate }: StoragePanelPro
           <div className="storage__detail">
             <h3 className="subhead">Storage guard</h3>
             <ul className="rows">
-              {refs.map((ref) => {
+              {rowRefs.map((ref) => {
                 const entity = entities[ref.entity_id];
                 return (
                   <li key={ref.entity_id} className="row">

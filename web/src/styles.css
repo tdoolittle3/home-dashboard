@@ -36,6 +36,12 @@
   --chart-used: #c2872f;
   --chart-free: #4a90d9;
   --chart-reserved: #a3599e;
+  /* Carved pies: the named shares inside the used wedge take the warm pair -
+     the first reuses the used amber, so a pie with one carve keeps today's
+     look - and the unaccounted remainder is a deliberately quiet slate. */
+  --chart-carve-a: #c2872f;
+  --chart-carve-b: #3aa08c;
+  --chart-other: #76819b;
 
   /* --- type scale --- */
   --fs-xs: 11px;
@@ -1024,6 +1030,18 @@ body {
   fill: var(--chart-reserved);
 }
 
+.disk__slice--carve-a {
+  fill: var(--chart-carve-a);
+}
+
+.disk__slice--carve-b {
+  fill: var(--chart-carve-b);
+}
+
+.disk__slice--other {
+  fill: var(--chart-other);
+}
+
 .disk__hole {
   fill: var(--surface);
 }
@@ -1090,6 +1108,18 @@ body {
 
 .disk__swatch--used {
   background: var(--chart-used);
+}
+
+.disk__swatch--carve-a {
+  background: var(--chart-carve-a);
+}
+
+.disk__swatch--carve-b {
+  background: var(--chart-carve-b);
+}
+
+.disk__swatch--other {
+  background: var(--chart-other);
 }
 
 .disk__swatch--free {

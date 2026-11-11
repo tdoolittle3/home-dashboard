@@ -1,4 +1,4 @@
-import type { FrigateSummary } from './types';
+import type { EntitySnapshot, FrigateSummary } from './types';
 
 export interface MountGroup {
   mount: string;
@@ -37,6 +37,33 @@ export function groupMounts(storage: FrigateSummary['storage']): MountGroup[] {
   }
 
   return [...groups.values()];
+}
+
+const UNIT_MB: Record<string, number> = {
+  B: 1 / 1_048_576,
+  kB: 1 / 1024,
+  KB: 1 / 1024,
+  KiB: 1 / 1024,
+  MB: 1,
+  MiB: 1,
+  GB: 1024,
+  GiB: 1024,
+  TB: 1024 * 1024,
+  TiB: 1024 * 1024,
+};
+
+/**
+ * A size sensor's reading in megabytes, or null when it cannot be one: entity
+ * missing, state not a number, or a unit that is not a byte count. HA's GB and
+ * Frigate's MB are mixed binary/decimal in practice; treated uniformly as
+ * binary here, the same squint the panel already applies to its two sources.
+ */
+export function toMb(entity: EntitySnapshot | undefined): number | null {
+  if (!entity || entity.missing) return null;
+  const value = Number(entity.state);
+  if (!Number.isFinite(value) || value < 0) return null;
+  const factor = UNIT_MB[entity.unit ?? ''];
+  return factor === undefined ? null : value * factor;
 }
 
 export function hasSizes(group: MountGroup): group is SizedMountGroup {

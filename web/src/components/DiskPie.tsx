@@ -1,5 +1,11 @@
 import { formatMb, formatNumber } from '../format';
 
+/** A named share carved out of the used wedge - what the space is actually holding. */
+export interface CarveShare {
+  label: string;
+  megabytes: number;
+}
+
 interface DiskPieProps {
   /** Primary mount name, used as the caption. */
   mount: string;
@@ -8,13 +14,24 @@ interface DiskPieProps {
   totalMb: number;
   usedMb: number;
   freeMb: number;
+  /**
+   * Named shares drawn as their own wedges inside the used share, with the
+   * unaccounted remainder as "Other". Empty or absent keeps the plain
+   * used/free/reserved pie.
+   */
+  carve?: CarveShare[];
 }
 
 interface Slice {
-  key: 'used' | 'free' | 'reserved';
+  key: string;
+  /** The palette class suffix: carve-a / carve-b / other / used / free / reserved. */
+  tone: string;
   label: string;
   megabytes: number;
 }
+
+/** Carved wedges alternate the two carve fills; neighbours never match. */
+const CARVE_TONES = ['carve-a', 'carve-b'] as const;
 
 const SIZE = 168;
 const RADIUS = 80;
@@ -77,18 +94,39 @@ function wedgePath(start: number, end: number): string {
  * The wedges are full sectors from the centre; the hole is a surface-coloured
  * disc laid over them. The geometry underneath is still a pie that sums to 100%.
  *
- * Fills are --chart-used / --chart-free / --chart-reserved, validated together
+ * With `carve`, the used share is subdivided into the named wedges plus an
+ * "Other" remainder, so the pie shows what the disk is holding rather than a
+ * single amber block; the headline percentage still covers the whole used
+ * share.
+ *
+ * Fills are --chart-used / --chart-free / --chart-reserved (and the
+ * --chart-carve-* pair plus --chart-other for carved pies), validated together
  * against --surface with the dataviz validator in dark mode, all pairs.
  */
-export function DiskPie({ mount, alsoServes = [], totalMb, usedMb, freeMb }: DiskPieProps) {
-  const slices: Slice[] = [
-    { key: 'used', label: 'Used', megabytes: Math.max(usedMb, 0) },
-    { key: 'free', label: 'Free', megabytes: Math.max(freeMb, 0) },
-  ];
+export function DiskPie({ mount, alsoServes = [], totalMb, usedMb, freeMb, carve = [] }: DiskPieProps) {
+  // The carved shares come from a different gauge (HA's sensors) than the
+  // used total (Frigate's), so they can overshoot it slightly; "Other" soaks
+  // up the honest remainder and clamps at zero rather than going negative.
+  const carves = carve.filter((entry) => entry.megabytes > 0);
+  const carvedMb = carves.reduce((sum, entry) => sum + entry.megabytes, 0);
+
+  const usedSlices: Slice[] = carves.length
+    ? [
+        ...carves.map((entry, index) => ({
+          key: `carve:${entry.label}`,
+          tone: CARVE_TONES[index % CARVE_TONES.length] as string,
+          label: entry.label,
+          megabytes: entry.megabytes,
+        })),
+        { key: 'other', tone: 'other', label: 'Other', megabytes: Math.max(usedMb - carvedMb, 0) },
+      ]
+    : [{ key: 'used', tone: 'used', label: 'Used', megabytes: Math.max(usedMb, 0) }];
+
+  const slices: Slice[] = [...usedSlices, { key: 'free', tone: 'free', label: 'Free', megabytes: Math.max(freeMb, 0) }];
 
   const reservedMb = totalMb - usedMb - freeMb;
   if (reservedMb > totalMb * RESERVED_FLOOR) {
-    slices.push({ key: 'reserved', label: 'Reserved', megabytes: reservedMb });
+    slices.push({ key: 'reserved', tone: 'reserved', label: 'Reserved', megabytes: reservedMb });
   }
 
   const whole = slices.reduce((sum, slice) => sum + slice.megabytes, 0);
@@ -102,7 +140,7 @@ export function DiskPie({ mount, alsoServes = [], totalMb, usedMb, freeMb }: Dis
     return { slice, start, end: slice === slices[slices.length - 1] ? 1 : cursor };
   });
 
-  const usedPercent = Math.round(share(slices[0]?.megabytes ?? 0) * 100);
+  const usedPercent = Math.round(share(usedSlices.reduce((sum, slice) => sum + slice.megabytes, 0)) * 100);
 
   const summary = [
     `${mount}:`,
@@ -120,7 +158,7 @@ export function DiskPie({ mount, alsoServes = [], totalMb, usedMb, freeMb }: Dis
             {wedges.map(({ slice, start, end }) => (
               <path
                 key={slice.key}
-                className={`disk__slice disk__slice--${slice.key}`}
+                className={`disk__slice disk__slice--${slice.tone}`}
                 d={wedgePath(start, end)}
               >
                 <title>{`${slice.label} ${formatMb(slice.megabytes)} (${formatNumber(share(slice.megabytes) * 100)}%)`}</title>
@@ -141,7 +179,7 @@ export function DiskPie({ mount, alsoServes = [], totalMb, usedMb, freeMb }: Dis
           <ul className="disk__legend">
             {slices.map((slice) => (
               <li key={slice.key} className="disk__key">
-                <span className={`disk__swatch disk__swatch--${slice.key}`} aria-hidden="true" />
+                <span className={`disk__swatch disk__swatch--${slice.tone}`} aria-hidden="true" />
                 <span className="disk__key-label">{slice.label}</span>
                 <span className="disk__key-value">{formatMb(slice.megabytes)}</span>
                 <span className="disk__key-pct">{formatNumber(share(slice.megabytes) * 100)}%</span>
