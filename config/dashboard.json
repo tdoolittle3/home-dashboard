@@ -21,7 +21,8 @@
     "'links' are the Services panel tiles (the topbar carries no links). An entry with 'service' (ha, frigate, jellyfin, uptimeKuma, immich) puts its url on that built-in tile, which already has live status. An entry without 'service' is a generic link tile; give it 'health' - a url the SERVER can reach (LAN IP, since it pings from inside the container) - and the tile gets a live up/down dot. 'url' stays browser-facing (the ts.net FQDN).",
     "Services published only through 'tailscale serve' (Hermes, Hermes Reports) bind loopback + the Tailscale IP, so there is no LAN health url. Their 'health' keeps the ts.net hostname (TLS needs it to verify) and 'resolve' pins that hostname to the host's Tailscale IP, since the container has no tailnet DNS. A 502/503/504 answer counts as down - that is the serve proxy covering for a dead backend.",
     "A link's 'group' names the Services panel section it sits under (sections keep config order; ungrouped tiles lead unlabelled) and 'icon' picks its glyph from web/src/components/TileIcon.tsx: home, camera, play, pulse, photo, shield, key, bot, report, chart, flow, plane, radio, tv, link. Unknown icon names fall back to 'link'.",
-    "Vaultwarden's web vault needs a secure context, so its url is the tailscale-serve HTTPS front door on :8443, not the plain-http :8222 the container publishes - that one is only the LAN health target."
+    "Vaultwarden's web vault needs a secure context, so its url is the tailscale-serve HTTPS front door on :8443, not the plain-http :8222 the container publishes - that one is only the LAN health target.",
+    "The top-level 'tv' block shapes /tv, the look-only page the Fire TV app (tv-app/) shows. 'rooms' are the ?room=<name> presets: each lists camera names for the hero row and panel ids for the status rail (look-only types just: entities, controls, system, ups - controls render but their switches are inert on the TV). A room named 'default' covers a missing or unknown ?room=; with no match at all, /tv shows every camera and every look-only panel. 'slideshow' turns the photo band on: 'album' is an Immich album id (the album's URL in Immich ends with it) served through the server's /api/photos/* proxy - needs IMMICH_BASE_URL and IMMICH_API_KEY, the TV never sees the key - and 'seconds' (default 20) is the dwell per photo. No 'slideshow' = no photo band, the rail widens instead."
   ],
   "assistant": {
     "model": "8b-abliterated"
@@ -29,6 +30,12 @@
   "outdoor": {
     "temperature": "sensor.outdoor_temperature",
     "humidity": "sensor.outdoor_humidity"
+  },
+  "tv": {
+    "rooms": {
+      "living": { "cameras": ["driveway", "backyard"], "panels": ["controls", "system", "power"] },
+      "bedroom": { "cameras": ["driveway"], "panels": ["controls"] }
+    }
   },
   "panels": [
     {

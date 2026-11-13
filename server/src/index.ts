@@ -9,6 +9,7 @@ import { MeshClient } from './mesh/client.js';
 import { registerAdsbRoutes } from './routes/adsb.js';
 import { registerApiRoutes } from './routes/api.js';
 import { registerHostRoutes } from './routes/host.js';
+import { registerPhotosRoutes } from './routes/photos.js';
 import { registerSnibblyRoutes } from './routes/snibbly.js';
 import { registerStreamRoute } from './routes/stream.js';
 import { SnapshotBuilder } from './snapshot.js';
@@ -55,6 +56,7 @@ async function main(): Promise<void> {
   registerApiRoutes(app, config, ha, snapshots, mesh);
   registerStreamRoute(app, config, ha, snapshots, mesh);
   registerSnibblyRoutes(app, config);
+  registerPhotosRoutes(app, config);
   registerAdsbRoutes(app, config);
   registerHostRoutes(app, config);
 

@@ -176,12 +176,36 @@ export interface AssistantConfig {
   model: string;
 }
 
+/**
+ * One /tv?room=<name> preset: which cameras the hero row shows and which
+ * panels fill the status rail. Both reference things declared elsewhere in
+ * this file - camera names from 'cameras' panels, panel ids of the look-only
+ * types (entities, controls, system, ups).
+ */
+export interface TvRoom {
+  cameras?: string[];
+  panels?: string[];
+}
+
+/**
+ * The /tv view. `slideshow.album` is an Immich album id served through the
+ * /api/photos/* proxy (needs IMMICH_BASE_URL and IMMICH_API_KEY); without it
+ * the photo band stays off. A room named "default" covers a missing or
+ * unknown ?room=; with no rooms at all, /tv shows every camera and every
+ * look-only panel.
+ */
+export interface TvConfig {
+  slideshow?: { album: string; seconds?: number };
+  rooms?: Record<string, TvRoom>;
+}
+
 export interface DashboardConfig {
   title: string;
   panels: Panel[];
   links: ServiceLink[];
   outdoor?: OutdoorRefs;
   assistant?: AssistantConfig;
+  tv?: TvConfig;
 }
 
 export interface AppConfig {
@@ -475,12 +499,52 @@ function loadDashboard(path: string): DashboardConfig {
     throw new Error(`${path}: "assistant" needs a "model" like "8b-abliterated"`);
   }
 
+  if (parsed.tv !== undefined) {
+    const tv = parsed.tv;
+    if (tv.slideshow !== undefined) {
+      // The id lands in a URL path we build against Immich, so keep it boring (uuid-shaped).
+      if (!/^[A-Za-z0-9-]+$/.test(tv.slideshow.album ?? '')) {
+        throw new Error(`${path}: "tv.slideshow" needs an "album" (an Immich album id)`);
+      }
+      const seconds = tv.slideshow.seconds;
+      if (seconds !== undefined && (typeof seconds !== 'number' || !Number.isFinite(seconds) || seconds < 3)) {
+        throw new Error(`${path}: "tv.slideshow.seconds" must be a number >= 3`);
+      }
+    }
+    if (tv.rooms !== undefined) {
+      const cameraNames = new Set(
+        parsed.panels.flatMap((panel) => (panel.type === 'cameras' ? panel.cameras.map((camera) => camera.name) : [])),
+      );
+      // The /tv page is look-only, so a room may only pull in panels that never write.
+      const tvPanelTypes = new Set(['entities', 'controls', 'system', 'ups']);
+      for (const [room, preset] of Object.entries(tv.rooms)) {
+        // Room names arrive as ?room= query values; keep them boring like camera names.
+        if (!/^[A-Za-z0-9_-]+$/.test(room)) throw new Error(`${path}: invalid tv room name "${room}"`);
+        for (const name of preset.cameras ?? []) {
+          if (!cameraNames.has(name)) {
+            throw new Error(`${path}: tv room "${room}" names unknown camera "${name}"`);
+          }
+        }
+        for (const id of preset.panels ?? []) {
+          const panel = parsed.panels.find((candidate) => candidate.id === id);
+          if (!panel) throw new Error(`${path}: tv room "${room}" names unknown panel "${id}"`);
+          if (!tvPanelTypes.has(panel.type)) {
+            throw new Error(
+              `${path}: tv room "${room}" names panel "${id}" of type "${panel.type}" - rooms may only use ${[...tvPanelTypes].join(', ')}`,
+            );
+          }
+        }
+      }
+    }
+  }
+
   return {
     title: parsed.title ?? 'Home',
     panels: parsed.panels,
     links,
     outdoor: parsed.outdoor,
     assistant: parsed.assistant,
+    tv: parsed.tv,
   };
 }
 
