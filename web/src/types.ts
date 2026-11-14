@@ -143,12 +143,25 @@ export interface AssistantConfig {
   model: string;
 }
 
+/** One /tv?room= preset: camera names for the hero row, look-only panel ids for the rail. Mirrors TvRoom in server/src/config.ts. */
+export interface TvRoom {
+  cameras?: string[];
+  panels?: string[];
+}
+
+/** The /tv view. Mirrors TvConfig in server/src/config.ts; no slideshow = the photo band stays off. */
+export interface TvConfig {
+  slideshow?: { album: string; seconds?: number };
+  rooms?: Record<string, TvRoom>;
+}
+
 export interface DashboardConfig {
   title: string;
   panels: Panel[];
   links: ServiceLink[];
   outdoor?: OutdoorRefs;
   assistant?: AssistantConfig;
+  tv?: TvConfig;
 }
 
 export type SourceResult<T> = { ok: true; data: T } | { ok: false; error: string };

@@ -2741,3 +2741,161 @@ body {
   color: var(--down);
   border-color: var(--down);
 }
+
+/* --- /tv: the look-only Fire TV page (TvApp.tsx) --- */
+
+/* 55" at couch distance: the whole type scale steps up ~1.5x and the dim tone
+   brightens, because across-the-room contrast is the one thing a TV page owes.
+   pointer-events: none on the root is what makes the reused panels look-only -
+   nothing here is clickable, including the camera buttons and lamp switches. */
+.tv {
+  --fs-xs: 16px;
+  --fs-sm: 19px;
+  --fs-md: 21px;
+  --fs-lg: 24px;
+  --fs-xl: 28px;
+  --fs-title: 40px;
+  --fs-hero: 60px;
+  --text-dim: #b9c1d1;
+  max-width: none;
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding: 16px 28px 24px;
+  pointer-events: none;
+  cursor: none;
+}
+
+/* The shell owns the single screen; nothing behind it may scroll either. */
+body:has(.tv) {
+  overflow: hidden;
+}
+
+.tv .topbar {
+  flex: none;
+  padding-bottom: 14px;
+  margin-bottom: 16px;
+}
+
+.tv-clock {
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* Cameras flex to fill the top ~55% of the screen; the stills drop their
+   aspect ratio and cover their boxes so the row is exactly as tall as the
+   space allows, whatever shape the streams are. */
+.tv .hero {
+  flex: 5;
+  min-height: 0;
+  margin-bottom: var(--gap);
+}
+
+.tv .hero .panel,
+.tv .hero .panel__body {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.tv .hero .panel__body {
+  flex: 1;
+}
+
+.tv .hero .cameras {
+  flex: 1;
+  min-height: 0;
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+}
+
+.tv .hero .camera {
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.tv .hero .camera__open {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.tv .hero .camera img {
+  height: 100%;
+  aspect-ratio: auto;
+}
+
+.tv .camera__expand {
+  display: none;
+}
+
+/* Recent detections live below the fold on a fixed screen; the stills are the story here. */
+.tv .hero .subhead,
+.tv .hero .rows {
+  display: none;
+}
+
+/* The bottom band: photos wide on the left, status panels stacked on the
+   right. Without a slideshow the rail's panels spread across the full width. */
+.tv-band {
+  flex: 4;
+  min-height: 0;
+  display: grid;
+  gap: var(--gap);
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+}
+
+.tv-band--bare {
+  grid-template-columns: none;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+}
+
+.tv-band--bare .tv-rail {
+  display: contents;
+}
+
+.tv-rail {
+  display: grid;
+  gap: var(--gap);
+  grid-auto-rows: min-content;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Exactly two <img> slots for the page's lifetime (TvSlideshow.tsx); the
+   back one preloads, the front one shows, opacity crossfades the swap. */
+.tv-slideshow {
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: #000;
+  box-shadow: var(--shadow-panel);
+}
+
+.tv-slideshow__img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  opacity: 0;
+  transition: opacity 900ms var(--ease);
+}
+
+.tv-slideshow__img--front {
+  opacity: 1;
+}
+
+.tv-slideshow__note {
+  position: absolute;
+  left: 16px;
+  bottom: 12px;
+  margin: 0;
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+}
