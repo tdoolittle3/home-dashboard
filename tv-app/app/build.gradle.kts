@@ -12,8 +12,8 @@ android {
         // Fire OS 7 (the 7.7.x TVs) is Android 9.
         minSdk = 28
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.0.1"
     }
 
     buildTypes {
