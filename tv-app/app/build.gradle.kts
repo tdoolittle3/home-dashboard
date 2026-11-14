@@ -3,6 +3,12 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
+// The fleet keystore, injected by CI (and usable locally). Without it, release
+// falls back to the machine's debug key - fine for a sideload, but only APKs
+// signed with THE SAME key can `adb install -r` over each other, so the APK the
+// provisioning script ships must always come from the keystore-signed CI build.
+val tvKeystore: String? = System.getenv("TV_KEYSTORE_FILE")?.takeIf { it.isNotBlank() }
+
 android {
     namespace = "com.thomas.ladybird"
     compileSdk = 34
@@ -16,9 +22,22 @@ android {
         versionName = "1.0.1"
     }
 
+    if (tvKeystore != null) {
+        signingConfigs {
+            create("release") {
+                storeFile = file(tvKeystore)
+                storePassword = System.getenv("TV_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("TV_KEY_ALIAS") ?: "ladybird"
+                keyPassword = System.getenv("TV_KEYSTORE_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
+            signingConfig = if (tvKeystore != null) signingConfigs.getByName("release")
+            else signingConfigs.getByName("debug")
         }
     }
 

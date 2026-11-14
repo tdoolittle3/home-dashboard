@@ -3,6 +3,13 @@
 What home automation may rely on. Anything not written here is an
 implementation detail and may change.
 
+## APK delivery
+
+CI (`.github/workflows/tv-apk.yml`) keeps the latest signed release APK on
+ladybird at **`~/apks/ladybird-tv.apk`** (atomic swap; never half-written).
+Provisioning should install from that path. All copies there share one signing
+key, so `adb install -r` always upgrades in place.
+
 ## Provisioning intent
 
 ```

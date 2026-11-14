@@ -36,6 +36,19 @@ export ANDROID_HOME=$HOME/android-sdk
 (Gradle finds the SDK via `ANDROID_HOME`; alternatively put `sdk.dir=/path/to/android-sdk`
 in `tv-app/local.properties` — never commit that file.)
 
+## CI builds (the APK the fleet actually installs)
+
+`.github/workflows/tv-apk.yml` builds a **signed release APK** on every push to
+main that touches `tv-app/` and ships it to ladybird at `~/apks/ladybird-tv.apk`
+— the path the home-automation repo's provisioning script installs from. It is
+signed with the fleet keystore (prod environment secrets `TV_KEYSTORE_B64` /
+`TV_KEYSTORE_PASSWORD`; master copy kept off-repo), so successive builds always
+`adb install -r` cleanly over each other. A locally-built debug APK has a
+different signature — installing one on a TV means the next CI upgrade needs an
+uninstall first, so prefer the ladybird copy for anything beyond bench testing.
+To sign locally with the same key: set `TV_KEYSTORE_FILE` and
+`TV_KEYSTORE_PASSWORD`, then `./gradlew assembleRelease`.
+
 ## Install on the Fire TV
 
 Enable ADB debugging on the TV (Settings → My Fire TV → Developer Options), then:
