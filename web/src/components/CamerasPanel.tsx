@@ -13,6 +13,9 @@ interface CamerasPanelProps {
   stillHeight?: number;
   /** Recent detections render under the stills they came from, not in Services. */
   frigate?: SourceResult<FrigateSummary> | null;
+  /** /tv's D-pad focus ring: the tile at this index wears camera--focused.
+      Pure presentation - TvApp owns the state and opens its own viewer. */
+  focusedIndex?: number | null;
 }
 
 type FrigateEventRow = FrigateSummary['recentEvents'][number];
@@ -42,6 +45,7 @@ export function CamerasPanel({
   refreshSeconds,
   stillHeight = 360,
   frigate,
+  focusedIndex = null,
 }: CamerasPanelProps) {
   const [tick, setTick] = useState(() => Date.now());
   const [viewing, setViewing] = useState<number | null>(null);
@@ -56,7 +60,7 @@ export function CamerasPanel({
     <Panel title={title} aside={`refreshes every ${refreshSeconds}s`}>
       <div className="cameras">
         {cameras.map((camera, index) => (
-          <figure key={camera.name} className="camera">
+          <figure key={camera.name} className={index === focusedIndex ? 'camera camera--focused' : 'camera'}>
             {/* A button rather than a click handler on the image, so the frame is
                 reachable by keyboard and announced as activatable. */}
             <button

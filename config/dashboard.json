@@ -22,7 +22,7 @@
     "Services published only through 'tailscale serve' (Hermes, Hermes Reports) bind loopback + the Tailscale IP, so there is no LAN health url. Their 'health' keeps the ts.net hostname (TLS needs it to verify) and 'resolve' pins that hostname to the host's Tailscale IP, since the container has no tailnet DNS. A 502/503/504 answer counts as down - that is the serve proxy covering for a dead backend.",
     "A link's 'group' names the Services panel section it sits under (sections keep config order; ungrouped tiles lead unlabelled) and 'icon' picks its glyph from web/src/components/TileIcon.tsx: home, camera, play, pulse, photo, shield, key, bot, report, chart, flow, plane, radio, tv, link. Unknown icon names fall back to 'link'.",
     "Vaultwarden's web vault needs a secure context, so its url is the tailscale-serve HTTPS front door on :8443, not the plain-http :8222 the container publishes - that one is only the LAN health target.",
-    "The top-level 'tv' block shapes /tv, the look-only page the Fire TV app (tv-app/) shows. 'rooms' are the ?room=<name> presets: each lists camera names for the hero row and panel ids for the status rail (look-only types just: entities, controls, system, ups - controls render but their switches are inert on the TV). A room named 'default' covers a missing or unknown ?room=; with no match at all, /tv shows every camera and every look-only panel. 'slideshow' turns the photo band on: 'album' is an Immich album id (the album's URL in Immich ends with it) served through the server's /api/photos/* proxy - needs IMMICH_BASE_URL and IMMICH_API_KEY, the TV never sees the key - and 'seconds' (default 20) is the dwell per photo. No 'slideshow' = no photo band, the rail widens instead."
+    "The top-level 'tv' block shapes /tv, the look-only page the Fire TV app (tv-app/) shows, laid out as a fixed 1080p stage scaled to whatever viewport the TV's WebView reports. 'rooms' are the ?room=<name> presets: each lists camera names for the hero row and panel ids for the bottom band (look-only types: entities, system, ups, adsb, and service - of which only uptimeKuma draws; 'controls' is still accepted but no longer renders on the TV). The adsb panel takes a wide cell of its own; the rest share a rail of side-by-side columns. A room named 'default' covers a missing or unknown ?room=; with no match at all, /tv shows every camera and every look-only panel. The remote works the cameras only: arrows move a focus ring along the hero row, OK opens that camera's live view, OK closes it. 'slideshow' turns the photo band on: 'album' is an Immich album id (the album's URL in Immich ends with it) served through the server's /api/photos/* proxy - needs IMMICH_BASE_URL and IMMICH_API_KEY, the TV never sees the key - and 'seconds' (default 20) is the dwell per photo. No 'slideshow' = no photo band, the rest of the band widens instead."
   ],
   "assistant": {
     "model": "8b-abliterated"
@@ -33,8 +33,9 @@
   },
   "tv": {
     "rooms": {
-      "living": { "cameras": ["driveway", "backyard"], "panels": ["controls", "system", "power"] },
-      "bedroom": { "cameras": ["driveway"], "panels": ["controls"] }
+      "default": { "panels": ["flights", "system", "power", "uptime"] },
+      "living": { "cameras": ["driveway", "backyard"], "panels": ["flights", "system", "power", "uptime"] },
+      "bedroom": { "cameras": ["driveway"], "panels": ["uptime"] }
     }
   },
   "panels": [

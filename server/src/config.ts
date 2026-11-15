@@ -184,9 +184,10 @@ export interface AssistantConfig {
 
 /**
  * One /tv?room=<name> preset: which cameras the hero row shows and which
- * panels fill the status rail. Both reference things declared elsewhere in
+ * panels fill the bottom band. Both reference things declared elsewhere in
  * this file - camera names from 'cameras' panels, panel ids of the look-only
- * types (entities, controls, system, ups).
+ * types (entities, system, ups, adsb, service; 'controls' is still accepted
+ * for old configs but no longer renders on the TV).
  */
 export interface TvRoom {
   cameras?: string[];
@@ -521,8 +522,11 @@ function loadDashboard(path: string): DashboardConfig {
       const cameraNames = new Set(
         parsed.panels.flatMap((panel) => (panel.type === 'cameras' ? panel.cameras.map((camera) => camera.name) : [])),
       );
-      // The /tv page is look-only, so a room may only pull in panels that never write.
-      const tvPanelTypes = new Set(['entities', 'controls', 'system', 'ups']);
+      // The /tv page is look-only, so a room may only pull in panels that never
+      // write. 'controls' stays accepted - the live bind-mounted config may
+      // still name one - but TvApp renders nothing for it; 'service' is
+      // accepted whole, of which TvApp renders only uptimeKuma.
+      const tvPanelTypes = new Set(['entities', 'controls', 'system', 'ups', 'adsb', 'service']);
       for (const [room, preset] of Object.entries(tv.rooms)) {
         // Room names arrive as ?room= query values; keep them boring like camera names.
         if (!/^[A-Za-z0-9_-]+$/.test(room)) throw new Error(`${path}: invalid tv room name "${room}"`);

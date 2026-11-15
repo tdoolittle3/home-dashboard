@@ -4,6 +4,9 @@ import type { CameraRef } from '../types';
 interface CameraViewerProps {
   camera: CameraRef;
   onClose: () => void;
+  /** /tv passes false: fullscreen from inside its scaled stage is unpredictable,
+      and the overlay already covers the stage, which there is the screen. */
+  allowFullscreen?: boolean;
 }
 
 /** How long a dropped stream stays on its fallback still before reconnecting. */
@@ -73,7 +76,7 @@ function exitFullscreen(): void {
  * refused in some embedded contexts. On iPhone, where only <video> can go
  * full screen, the native player is tried once the video is ready.
  */
-export function CameraViewer({ camera, onClose }: CameraViewerProps) {
+export function CameraViewer({ camera, onClose, allowFullscreen = true }: CameraViewerProps) {
   const [tick, setTick] = useState(() => Date.now());
   const [hidden, setHidden] = useState(() => document.visibilityState === 'hidden');
   const [streamDown, setStreamDown] = useState(false);
@@ -160,7 +163,7 @@ export function CameraViewer({ camera, onClose }: CameraViewerProps) {
   // fires webkitfullscreenchange instead of the standard event.
   useEffect(() => {
     const node = overlayRef.current;
-    if (FULLSCREEN_SUPPORTED && node) requestFullscreenOn(node);
+    if (allowFullscreen && FULLSCREEN_SUPPORTED && node) requestFullscreenOn(node);
     const sync = () => {
       if (currentFullscreenElement() === overlayRef.current) {
         enteredFullscreenRef.current = true;
@@ -174,7 +177,7 @@ export function CameraViewer({ camera, onClose }: CameraViewerProps) {
       document.removeEventListener('fullscreenchange', sync);
       document.removeEventListener('webkitfullscreenchange', sync);
     };
-  }, []);
+  }, [allowFullscreen]);
 
   // Closing while in browser fullscreen goes through the exit, and the change
   // handler above does the rest; everywhere else the overlay just closes.
