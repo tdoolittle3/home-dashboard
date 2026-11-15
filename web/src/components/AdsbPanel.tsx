@@ -103,24 +103,11 @@ interface Row {
 }
 
 /**
- * Live local air traffic from the ADS-B receiver. The tar1090 map is embedded
- * as-is - it is already the best view of the sky - and the table under it is
- * the glanceable summary: who is overhead right now, and is any of it unusual.
- * Everything rides the dashboard origin through the server's /adsb/* relay:
- * the page may be open over Tailscale HTTPS, where a plain-http receiver URL
- * is blocked as mixed content. The relay 502s when the receiver is down, so
- * the panel still carries its own offline state.
+ * The polled feed behind both renderings of the panel (AdsbPanel, and /tv's
+ * split TvAdsbPanels): receiver position, the raw aircraft list, and the
+ * badged table rows derived from them.
  */
-export function AdsbPanel({ title, refreshSeconds }: AdsbPanelProps) {
-  const mapUrl = `${ADSB_BASE}/`;
-  // On a phone tar1090's top button row (U/H/T) lands on the selected-aircraft
-  // card's close box, so a tapped plane can never be dismissed. Pinch-zoom
-  // covers the lost +/-; the full-map link keeps every control. Read once:
-  // swapping src on rotate would reload the map.
-  const [frameUrl] = useState(() =>
-    window.matchMedia('(max-width: 560px)').matches ? `${mapUrl}?hideButtons` : mapUrl,
-  );
-
+function useAdsbFeed(refreshSeconds: number) {
   const [aircraft, setAircraft] = useState<Aircraft[] | null>(null);
   const [offline, setOffline] = useState(false);
   const [receiver, setReceiver] = useState<Receiver | null>(null);
@@ -223,9 +210,104 @@ export function AdsbPanel({ title, refreshSeconds }: AdsbPanelProps) {
     return rows;
   }, [aircraft, receiver]);
 
+  return { aircraft, offline, rows, tracked, withPosition };
+}
+
+interface FeedView {
+  aircraft: Aircraft[] | null;
+  offline: boolean;
+  rows: Row[];
+  refreshSeconds: number;
+}
+
+/** The glanceable summary under (or beside) the map: the table, or why there isn't one. */
+function AircraftTable({ aircraft, offline, rows, refreshSeconds }: FeedView) {
+  if (offline) {
+    return (
+      <p className="empty">
+        Receiver offline or no data - the SDR service may be stopped. Retrying every {refreshSeconds}s.
+      </p>
+    );
+  }
+  if (!aircraft) return <p className="empty">Waiting for aircraft data…</p>;
+  if (rows.length === 0) return <p className="empty">Nothing in range right now.</p>;
+  return (
+    <div className="adsb__scroll">
+      <table className="adsb__table">
+        <thead>
+          <tr>
+            <th>Flight</th>
+            <th className="adsb__optional">Type</th>
+            <th>Alt ft</th>
+            <th>Spd kt</th>
+            <th>Dist km</th>
+            <th className="adsb__optional">Sig dBm</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map(({ aircraft: a, distanceKm, badges }) => {
+            const alt = altitudeFt(a);
+            return (
+              <tr key={a.hex}>
+                <td>
+                  <a
+                    className="adsb__flight"
+                    href={`https://globe.adsbexchange.com/?icao=${encodeURIComponent(a.hex)}`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {callsign(a)}
+                  </a>
+                  {badges.map((badge) => (
+                    <span key={badge.label} className={`badge badge--${badge.tone}`}>
+                      {badge.label}
+                    </span>
+                  ))}
+                </td>
+                <td className="adsb__optional">{a.t ?? '—'}</td>
+                <td>{alt === null ? '—' : alt === 'ground' ? 'ground' : formatNumber(alt)}</td>
+                <td>{typeof a.gs === 'number' ? Math.round(a.gs) : '—'}</td>
+                <td>{distanceKm === null ? '—' : formatNumber(distanceKm)}</td>
+                <td className="adsb__optional">{typeof a.rssi === 'number' ? a.rssi.toFixed(1) : '—'}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/** "N tracked · M with position", or the outage in two words. */
+function feedAside({ aircraft, offline, tracked, withPosition }: ReturnType<typeof useAdsbFeed>): string | null {
+  if (offline) return 'receiver offline';
+  return aircraft ? `${tracked} tracked · ${withPosition} with position` : null;
+}
+
+/**
+ * Live local air traffic from the ADS-B receiver. The tar1090 map is embedded
+ * as-is - it is already the best view of the sky - and the table under it is
+ * the glanceable summary: who is overhead right now, and is any of it unusual.
+ * Everything rides the dashboard origin through the server's /adsb/* relay:
+ * the page may be open over Tailscale HTTPS, where a plain-http receiver URL
+ * is blocked as mixed content. The relay 502s when the receiver is down, so
+ * the panel still carries its own offline state.
+ */
+export function AdsbPanel({ title, refreshSeconds }: AdsbPanelProps) {
+  const mapUrl = `${ADSB_BASE}/`;
+  // On a phone tar1090's top button row (U/H/T) lands on the selected-aircraft
+  // card's close box, so a tapped plane can never be dismissed. Pinch-zoom
+  // covers the lost +/-; the full-map link keeps every control. Read once:
+  // swapping src on rotate would reload the map.
+  const [frameUrl] = useState(() =>
+    window.matchMedia('(max-width: 560px)').matches ? `${mapUrl}?hideButtons` : mapUrl,
+  );
+
+  const feed = useAdsbFeed(refreshSeconds);
+
   const aside = (
     <>
-      {offline ? 'receiver offline' : aircraft ? `${tracked} tracked · ${withPosition} with position` : null}
+      {feedAside(feed)}
       <a className="adsb__open" href={mapUrl} target="_blank" rel="noreferrer">
         Open full map ↗
       </a>
@@ -243,61 +325,28 @@ export function AdsbPanel({ title, refreshSeconds }: AdsbPanelProps) {
           allowFullScreen
           allow="fullscreen"
         />
-
-        {offline ? (
-          <p className="empty">
-            Receiver offline or no data - the SDR service may be stopped. Retrying every {refreshSeconds}s.
-          </p>
-        ) : !aircraft ? (
-          <p className="empty">Waiting for aircraft data…</p>
-        ) : rows.length === 0 ? (
-          <p className="empty">Nothing in range right now.</p>
-        ) : (
-          <div className="adsb__scroll">
-            <table className="adsb__table">
-              <thead>
-                <tr>
-                  <th>Flight</th>
-                  <th className="adsb__optional">Type</th>
-                  <th>Alt ft</th>
-                  <th>Spd kt</th>
-                  <th>Dist km</th>
-                  <th className="adsb__optional">Sig dBm</th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map(({ aircraft: a, distanceKm, badges }) => {
-                  const alt = altitudeFt(a);
-                  return (
-                    <tr key={a.hex}>
-                      <td>
-                        <a
-                          className="adsb__flight"
-                          href={`https://globe.adsbexchange.com/?icao=${encodeURIComponent(a.hex)}`}
-                          target="_blank"
-                          rel="noreferrer"
-                        >
-                          {callsign(a)}
-                        </a>
-                        {badges.map((badge) => (
-                          <span key={badge.label} className={`badge badge--${badge.tone}`}>
-                            {badge.label}
-                          </span>
-                        ))}
-                      </td>
-                      <td className="adsb__optional">{a.t ?? '—'}</td>
-                      <td>{alt === null ? '—' : alt === 'ground' ? 'ground' : formatNumber(alt)}</td>
-                      <td>{typeof a.gs === 'number' ? Math.round(a.gs) : '—'}</td>
-                      <td>{distanceKm === null ? '—' : formatNumber(distanceKm)}</td>
-                      <td className="adsb__optional">{typeof a.rssi === 'number' ? a.rssi.toFixed(1) : '—'}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <AircraftTable {...feed} refreshSeconds={refreshSeconds} />
       </div>
     </Panel>
+  );
+}
+
+/**
+ * /tv's split pair, one shared feed: the map as the band's big cell, the
+ * aircraft list as its own card beside it, so neither steals the other's
+ * height. Returns two sibling panels - the band's flex row places them.
+ */
+export function TvAdsbPanels({ title, refreshSeconds }: AdsbPanelProps) {
+  const feed = useAdsbFeed(refreshSeconds);
+  return (
+    <>
+      <Panel title={title} aside={feedAside(feed)} className="tv-map-panel">
+        {/* hideButtons: tar1090's control strip is dead weight on a look-only screen. */}
+        <iframe className="adsb__map" src={`${ADSB_BASE}/?hideButtons`} title="Live ADS-B map (tar1090)" loading="lazy" />
+      </Panel>
+      <Panel title="Nearby aircraft" className="tv-flightlist-panel">
+        <AircraftTable {...feed} refreshSeconds={refreshSeconds} />
+      </Panel>
+    </>
   );
 }

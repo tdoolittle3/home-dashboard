@@ -47,6 +47,26 @@ function health(data: KumaSummary): { level: 'ok' | 'degraded' | 'outage' | 'unk
   return { level: 'ok', title: 'All systems up', sub: `${data.up} of ${total} monitors up` };
 }
 
+/**
+ * The traffic light on its own, normalized from any source state - /tv's
+ * merged status card wants just this, without the panel or the monitor list.
+ */
+export function KumaHealth({ result }: { result: SourceResult<KumaSummary> | null }) {
+  const state = result?.ok
+    ? health(result.data)
+    : {
+        level: 'unknown' as const,
+        title: 'Uptime status unavailable',
+        sub: result && !result.ok ? result.error : 'not configured',
+      };
+  return (
+    <div className={`health health--${state.level}`}>
+      <span className="health__title">{state.title}</span>
+      <span className="health__sub">{state.sub}</span>
+    </div>
+  );
+}
+
 /** The right-hand cell: latency while up, otherwise the state in words. */
 function valueFor(monitor: KumaMonitor): string {
   if (monitor.status === 'up' && monitor.responseTimeMs !== null) return `${formatNumber(monitor.responseTimeMs)} ms`;
@@ -78,13 +98,9 @@ export function UptimePanel({ title, result }: UptimePanelProps) {
             </p>
           );
         }
-        const state = health(data);
         return (
           <>
-            <div className={`health health--${state.level}`}>
-              <span className="health__title">{state.title}</span>
-              <span className="health__sub">{state.sub}</span>
-            </div>
+            <KumaHealth result={result} />
             <Collapsible label={`all ${data.monitors.length} monitors`}>
               <ul className="rows">
                 {data.monitors.map((monitor) => {

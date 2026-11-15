@@ -1,13 +1,11 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { AdsbPanel } from './components/AdsbPanel';
+import { TvAdsbPanels } from './components/AdsbPanel';
 import { CamerasPanel } from './components/CamerasPanel';
 import { CameraViewer } from './components/CameraViewer';
 import { EntitiesPanel } from './components/EntitiesPanel';
 import { StoragePanel } from './components/StoragePanel';
-import { SystemPanel } from './components/SystemPanel';
 import { TvSlideshow } from './components/TvSlideshow';
-import { UpsPanel } from './components/UpsPanel';
-import { UptimePanel } from './components/UptimePanel';
+import { TvStatusPanel } from './components/TvStatusPanel';
 import { formatState } from './format';
 import type { Panel, TvRoom } from './types';
 import { useDashboard } from './useDashboard';
@@ -173,27 +171,19 @@ export function TvApp() {
   const railPanels = dashboard.panels.filter((panel) =>
     preset?.panels ? preset.panels.includes(panel.id) : LOOK_ONLY_TYPES.has(panel.type),
   );
-  // The ADS-B map needs a wide cell of its own; the rest share the rail.
-  const widePanels = railPanels.filter((panel) => panel.type === 'adsb');
-  const compactPanels = railPanels.filter((panel) => panel.type !== 'adsb');
+  // The band deals these into fixed roles: the ADS-B feed becomes the wide map
+  // plus its own aircraft-list card, and system/ups/uptime squash into the one
+  // status card so the map gets their old space. Anything else (entities,
+  // storage - fallback mode mostly) still rails.
+  const adsbPanel = railPanels.find((panel): panel is Extract<Panel, { type: 'adsb' }> => panel.type === 'adsb');
+  const systemPanel = railPanels.find((panel): panel is Extract<Panel, { type: 'system' }> => panel.type === 'system');
+  const upsPanel = railPanels.find((panel): panel is Extract<Panel, { type: 'ups' }> => panel.type === 'ups');
+  const hasKuma = railPanels.some((panel) => panel.type === 'service' && panel.service === 'uptimeKuma');
+  const otherPanels = railPanels.filter((panel) => panel.type === 'entities');
 
   const slideshow = dashboard.tv?.slideshow;
 
   const renderPanel = (panel: Panel) => {
-    if (panel.type === 'system') {
-      return <SystemPanel key={panel.id} title={panel.title} metrics={panel.metrics} entities={entities} />;
-    }
-    if (panel.type === 'ups') {
-      return <UpsPanel key={panel.id} title={panel.title} refs={panel.entities} entities={entities} />;
-    }
-    if (panel.type === 'adsb') {
-      return <AdsbPanel key={panel.id} title={panel.title} refreshSeconds={panel.refreshSeconds ?? 8} />;
-    }
-    if (panel.type === 'service') {
-      return panel.service === 'uptimeKuma' ? (
-        <UptimePanel key={panel.id} title={panel.title} result={sources.uptimeKuma} />
-      ) : null;
-    }
     if (panel.type === 'entities') {
       return panel.chart === 'disk' ? (
         <StoragePanel
@@ -207,8 +197,6 @@ export function TvApp() {
         <EntitiesPanel key={panel.id} title={panel.title} refs={panel.entities} entities={entities} />
       );
     }
-    // Anything else a room preset names (e.g. controls, still accepted by the
-    // server for old configs) has no place on a look-only screen.
     return null;
   };
 
@@ -250,8 +238,16 @@ export function TvApp() {
 
       <div className="tv-band">
         {slideshow ? <TvSlideshow seconds={slideshow.seconds ?? 20} /> : null}
-        {widePanels.map(renderPanel)}
-        {compactPanels.length > 0 ? <div className="tv-rail">{compactPanels.map(renderPanel)}</div> : null}
+        {adsbPanel ? <TvAdsbPanels title={adsbPanel.title} refreshSeconds={adsbPanel.refreshSeconds ?? 8} /> : null}
+        {otherPanels.length > 0 ? <div className="tv-rail">{otherPanels.map(renderPanel)}</div> : null}
+        {systemPanel || upsPanel || hasKuma ? (
+          <TvStatusPanel
+            systemMetrics={systemPanel?.metrics}
+            upsRefs={upsPanel?.entities}
+            kuma={hasKuma ? sources.uptimeKuma : undefined}
+            entities={entities}
+          />
+        ) : null}
       </div>
 
       {viewing !== null && cameras[viewing] ? (

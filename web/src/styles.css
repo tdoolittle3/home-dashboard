@@ -2855,10 +2855,10 @@ body.tv-page {
   display: none;
 }
 
-/* The bottom band, left to right: photos (when configured), the ADS-B map,
-   then the rail of compact status panels. The band is only ~415px tall, so
-   the rail deals its panels into side-by-side columns - stacked they would
-   clip against the fixed stage. */
+/* The bottom band, left to right: photos (when configured), the ADS-B map as
+   the big flexible cell, the aircraft list on its own card, then the one
+   merged status card (TvStatusPanel). The band is only ~430px tall, so every
+   card clips its own overflow against the fixed stage. */
 .tv-band {
   flex: 4;
   min-height: 0;
@@ -2870,12 +2870,11 @@ body.tv-page {
   flex: 0 0 480px;
 }
 
-/* The wide cell: the ADS-B panel claims a fixed slot beside the rail. */
 .tv-band > .panel {
-  flex: 0 0 620px;
   min-height: 0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .tv-band > .panel .panel__body {
@@ -2883,6 +2882,25 @@ body.tv-page {
   min-height: 0;
   display: flex;
   flex-direction: column;
+}
+
+/* The map takes whatever the fixed-width cards leave over. */
+.tv-map-panel {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.tv-flightlist-panel {
+  flex: 0 0 400px;
+}
+
+.tv-status-panel {
+  flex: 0 0 700px;
+}
+
+/* A room with a single band card (e.g. uptime-only) lets it have the row. */
+.tv-band > .panel:only-child {
+  flex: 1 1 auto;
 }
 
 .tv-rail {
@@ -2900,16 +2918,9 @@ body.tv-page {
   overflow: hidden;
 }
 
-/* ADS-B in a short wide cell: the map takes everything the table rows leave,
-   the table keeps its four freshest rows, and the optional columns and the
-   full-map link (nothing on a TV can follow it) go. */
-.tv .adsb {
-  height: 100%;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
-
+/* The map fills its card; the list card keeps the eight freshest rows and
+   drops the optional columns and the full-map link (nothing on a TV can
+   follow a link anyway). */
 .tv .adsb__map {
   flex: 1;
   min-height: 0;
@@ -2921,7 +2932,7 @@ body.tv-page {
   overflow: hidden;
 }
 
-.tv .adsb__table tbody tr:nth-child(n + 5) {
+.tv .adsb__table tbody tr:nth-child(n + 9) {
   display: none;
 }
 
@@ -2930,14 +2941,69 @@ body.tv-page {
   display: none;
 }
 
-.tv .adsb .empty {
+.tv .empty {
   margin: auto;
 }
 
-/* Kuma on TV is its traffic light; the collapsible monitor list is inert
-   under pointer-events: none, so its dead toggle goes. */
-.tv .collapsible {
-  display: none;
+/* --- the merged status card: Kuma light + battery gauge in a side column,
+   the system tiles squashed into the rest --- */
+
+.tv-status {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: 20px;
+}
+
+.tv-status__side {
+  flex: 0 0 230px;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.tv-status__side .ups {
+  gap: 6px;
+}
+
+.tv-status__side .ups__gauge {
+  width: 150px;
+  height: 150px;
+}
+
+.tv-status__system {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.tv-status__system .system {
+  gap: 8px;
+}
+
+.tv-status__system .system__hero {
+  padding: 0 0 6px;
+}
+
+.tv-status__system .system__tiles {
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.tv-status__system .system__tile {
+  padding: 5px 10px 6px;
+  gap: 2px;
+}
+
+/* One notch down from the TV scale, so all nine readings fit three-wide. */
+.tv-status__system .system__tile-label {
+  font-size: 14px;
+}
+
+.tv-status__system .system__tile-value {
+  font-size: 19px;
 }
 
 /* The D-pad focus ring (TvApp.tsx owns which tile wears it). Inset, because
