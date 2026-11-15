@@ -7,6 +7,8 @@ interface SystemPanelProps {
   title: string;
   metrics: SystemMetricRef[];
   entities: Record<string, EntitySnapshot>;
+  /** Render without the Panel chrome - /tv's merged status card embeds the tiles. */
+  bare?: boolean;
 }
 
 /** `off` is an entity that is missing or unavailable, drawn dim rather than coloured. */
@@ -60,7 +62,7 @@ function formatSince(entity: EntitySnapshot | undefined): string {
  * rather than being guessed here, because what counts as hot or full depends on
  * the box.
  */
-export function SystemPanel({ title, metrics, entities }: SystemPanelProps) {
+export function SystemPanel({ title, metrics, entities, bare = false }: SystemPanelProps) {
   // Uptime is derived from a fixed instant, so it has to advance on its own.
   const [now, setNow] = useState(() => Date.now());
   useEffect(() => {
@@ -77,9 +79,8 @@ export function SystemPanel({ title, metrics, entities }: SystemPanelProps) {
     .sort()
     .at(-1);
 
-  return (
-    <Panel title={title} aside={freshest ? `updated ${formatRelative(freshest)}` : null}>
-      <div className="system">
+  const body = (
+    <div className="system">
         {uptimes.map((ref) => {
           const entity = entities[ref.entity_id];
           const seconds = elapsedSeconds(entity, now);
@@ -122,6 +123,8 @@ export function SystemPanel({ title, metrics, entities }: SystemPanelProps) {
           </ul>
         ) : null}
       </div>
-    </Panel>
   );
+
+  if (bare) return body;
+  return <Panel title={title} aside={freshest ? `updated ${formatRelative(freshest)}` : null}>{body}</Panel>;
 }

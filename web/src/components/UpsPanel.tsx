@@ -8,6 +8,10 @@ interface UpsPanelProps {
   title: string;
   refs: UpsEntityRefs;
   entities: Record<string, EntitySnapshot>;
+  /** Render without the Panel chrome - /tv's merged status card embeds the gauge. */
+  bare?: boolean;
+  /** Gauge and banner only: no load/voltage stats, no sparkline (and no history fetch). */
+  compact?: boolean;
 }
 
 /**
@@ -140,7 +144,7 @@ function VoltageSparkline({ points }: { points: HistoryPoint[] }) {
  * judged against. The guard's own verdict (the problem sensor's status
  * attribute) drives the look, so the panel and the ntfy alerts never disagree.
  */
-export function UpsPanel({ title, refs, entities }: UpsPanelProps) {
+export function UpsPanel({ title, refs, entities, bare = false, compact = false }: UpsPanelProps) {
   const problem = entities[refs.problem];
   const chargeEntity = entities[refs.charge];
   const runtimeEntity = entities[refs.runtime];
@@ -180,6 +184,7 @@ export function UpsPanel({ title, refs, entities }: UpsPanelProps) {
 
   const [history, setHistory] = useState<HistoryPoint[]>([]);
   useEffect(() => {
+    if (compact) return;
     let alive = true;
     const pull = () => {
       fetchHistory(refs.voltage, HISTORY_HOURS)
@@ -196,7 +201,7 @@ export function UpsPanel({ title, refs, entities }: UpsPanelProps) {
       alive = false;
       clearInterval(timer);
     };
-  }, [refs.voltage]);
+  }, [refs.voltage, compact]);
 
   const freshest = [refs.charge, refs.runtime, refs.load, refs.voltage, refs.problem]
     .map((id) => entities[id]?.lastChanged ?? null)
@@ -206,9 +211,8 @@ export function UpsPanel({ title, refs, entities }: UpsPanelProps) {
 
   const chargeFraction = charge === null ? 0 : Math.min(1, Math.max(0, charge / 100));
 
-  return (
-    <Panel title={title} aside={freshest ? `updated ${formatRelative(freshest)}` : null}>
-      <div className={`ups ups--${mode}`}>
+  const body = (
+    <div className={`ups ups--${mode}`}>
         {mode === 'critical' ? (
           <div className="ups__banner ups__banner--critical" role="alert">
             <span className="ups__banner-title">⚡ {criticalTitle(upsStatus)}</span>
@@ -266,21 +270,25 @@ export function UpsPanel({ title, refs, entities }: UpsPanelProps) {
           </div>
         </div>
 
-        <div className="ups__stats">
-          <div className="ups__stat">
-            <span className="ups__stat-value">{load === null || mode === 'off' ? '—' : `${formatNumber(load)}%`}</span>
-            <span className="ups__stat-label">load</span>
+        {!compact ? (
+          <div className="ups__stats">
+            <div className="ups__stat">
+              <span className="ups__stat-value">{load === null || mode === 'off' ? '—' : `${formatNumber(load)}%`}</span>
+              <span className="ups__stat-label">load</span>
+            </div>
+            <div className="ups__stat">
+              <span className="ups__stat-value">
+                {voltage === null || mode === 'off' ? '—' : `${formatNumber(voltage)} V`}
+              </span>
+              <span className="ups__stat-label">input</span>
+            </div>
           </div>
-          <div className="ups__stat">
-            <span className="ups__stat-value">
-              {voltage === null || mode === 'off' ? '—' : `${formatNumber(voltage)} V`}
-            </span>
-            <span className="ups__stat-label">input</span>
-          </div>
-        </div>
+        ) : null}
 
-        {history.length >= 2 ? <VoltageSparkline points={history} /> : null}
+        {!compact && history.length >= 2 ? <VoltageSparkline points={history} /> : null}
       </div>
-    </Panel>
   );
+
+  if (bare) return body;
+  return <Panel title={title} aside={freshest ? `updated ${formatRelative(freshest)}` : null}>{body}</Panel>;
 }
