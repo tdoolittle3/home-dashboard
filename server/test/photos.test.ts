@@ -46,16 +46,11 @@ describe('photos routes', () => {
       expect((await app.inject({ url: '/api/photos/slideshow' })).statusCode).toBe(503);
     });
 
-    it('lists the album image ids, dropping videos and odd ids', async () => {
+    it('lists the album image ids, dropping odd ids', async () => {
       fetchMock.mockResolvedValue(
         new Response(
           JSON.stringify({
-            assets: [
-              { id: 'aaa', type: 'IMAGE' },
-              { id: 'bbb', type: 'VIDEO' },
-              { id: '../../etc', type: 'IMAGE' },
-              { id: 'ccc', type: 'IMAGE' },
-            ],
+            assets: { items: [{ id: 'aaa' }, { id: '../../etc' }, { id: 'ccc' }], nextPage: null },
           }),
           { status: 200 },
         ),
@@ -66,13 +61,14 @@ describe('photos routes', () => {
       const body = res.json() as { assets: string[] };
       expect([...body.assets].sort()).toEqual(['aaa', 'ccc']);
 
-      const [url, init] = fetchMock.mock.calls[0] as [string, { headers: Record<string, string> }];
-      expect(url).toBe('http://immich.invalid/api/albums/album-1');
+      const [url, init] = fetchMock.mock.calls[0] as [string, { headers: Record<string, string>; body: string }];
+      expect(url).toBe('http://immich.invalid/api/search/metadata');
       expect(init.headers['x-api-key']).toBe('secret');
+      expect(JSON.parse(init.body)).toMatchObject({ albumIds: ['album-1'], type: 'IMAGE' });
     });
 
     it('serves repeat requests from the cache', async () => {
-      fetchMock.mockResolvedValue(new Response(JSON.stringify({ assets: [{ id: 'aaa', type: 'IMAGE' }] })));
+      fetchMock.mockResolvedValue(new Response(JSON.stringify({ assets: { items: [{ id: 'aaa' }], nextPage: null } })));
       await start(makeConfig());
       await app.inject({ url: '/api/photos/slideshow' });
       await app.inject({ url: '/api/photos/slideshow' });

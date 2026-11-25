@@ -23,12 +23,12 @@ export async function getText(
 
 export async function fetchWithTimeout(
   url: string,
-  init: { headers?: Record<string, string>; timeoutMs?: number } = {},
+  init: { headers?: Record<string, string>; timeoutMs?: number; method?: string; body?: string } = {},
 ): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), init.timeoutMs ?? DEFAULT_TIMEOUT_MS);
   try {
-    return await fetch(url, { headers: init.headers, signal: controller.signal });
+    return await fetch(url, { method: init.method, body: init.body, headers: init.headers, signal: controller.signal });
   } finally {
     clearTimeout(timer);
   }

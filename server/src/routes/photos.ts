@@ -2,7 +2,7 @@ import { Readable } from 'node:stream';
 import type { ReadableStream as WebReadableStream } from 'node:stream/web';
 import type { FastifyInstance } from 'fastify';
 import type { AppConfig } from '../config.js';
-import { cached, fetchWithTimeout, getJson } from '../sources/http.js';
+import { cached, fetchWithTimeout } from '../sources/http.js';
 
 /** Asset ids ride URL paths we build against Immich, so only uuid-shaped ids pass. */
 const ASSET_ID = /^[A-Za-z0-9-]+$/;
@@ -10,9 +10,12 @@ const ASSET_ID = /^[A-Za-z0-9-]+$/;
 /** How long one album listing serves /api/photos/slideshow before Immich is asked again. */
 const ALBUM_TTL_MS = 5 * 60 * 1000;
 
-interface RawAlbum {
-  assets?: { id?: unknown; type?: unknown }[];
+interface RawSearchPage {
+  assets?: { items?: { id?: unknown }[]; nextPage?: unknown };
 }
+
+/** Safety stop so a misbehaving server cannot page forever. */
+const MAX_PAGES = 20;
 
 /** Fisher-Yates, so the TV does not replay the album in upload order every cycle. */
 function shuffled(ids: string[]): string[] {
@@ -44,14 +47,26 @@ export function registerPhotosRoutes(app: FastifyInstance, config: AppConfig): v
     ? { 'x-api-key': immich.apiKey, Accept: 'application/json' }
     : {};
 
+  // GET /albums/:id no longer carries the asset list on current Immich, so the
+  // album's images come from metadata search filtered to the album.
   const fetchAlbumIds = cached(ALBUM_TTL_MS, async (): Promise<string[]> => {
-    const album = await getJson<RawAlbum>(`${immich!.baseUrl}/api/albums/${slideshow!.album}`, {
-      headers,
-      timeoutMs: 10_000,
-    });
-    return (album.assets ?? [])
-      .filter((asset) => asset.type === 'IMAGE' && typeof asset.id === 'string' && ASSET_ID.test(asset.id))
-      .map((asset) => asset.id as string);
+    const ids: string[] = [];
+    let page: string | null = '1';
+    for (let n = 0; page && n < MAX_PAGES; n++) {
+      const response = await fetchWithTimeout(`${immich!.baseUrl}/api/search/metadata`, {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ albumIds: [slideshow!.album], type: 'IMAGE', size: 1000, page: Number(page) }),
+        timeoutMs: 10_000,
+      });
+      if (!response.ok) throw new Error(`immich answered ${response.status}`);
+      const body = (await response.json()) as RawSearchPage;
+      for (const item of body.assets?.items ?? []) {
+        if (typeof item.id === 'string' && ASSET_ID.test(item.id)) ids.push(item.id);
+      }
+      page = typeof body.assets?.nextPage === 'string' ? body.assets.nextPage : null;
+    }
+    return ids;
   });
 
   app.get('/api/photos/slideshow', async (_request, reply) => {
