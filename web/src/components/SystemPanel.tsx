@@ -12,7 +12,7 @@ interface SystemPanelProps {
 }
 
 /** `off` is an entity that is missing or unavailable, drawn dim rather than coloured. */
-type Level = 'ok' | 'warn' | 'crit' | 'off';
+export type Level = 'ok' | 'warn' | 'crit' | 'off';
 
 /** Home Assistant has reported boot time under both device classes across versions. */
 const CLOCK_CLASSES = new Set(['timestamp', 'uptime']);
@@ -20,27 +20,27 @@ const CLOCK_CLASSES = new Set(['timestamp', 'uptime']);
 /** How often the elapsed-time figures advance without any state change from HA. */
 const TICK_MS = 30_000;
 
-function kindOf(ref: SystemMetricRef, entity: EntitySnapshot | undefined): SystemMetricKind {
+export function kindOf(ref: SystemMetricRef, entity: EntitySnapshot | undefined): SystemMetricKind {
   if (ref.kind) return ref.kind;
   if (entity?.deviceClass && CLOCK_CLASSES.has(entity.deviceClass)) return 'uptime';
   if (entity?.unit === '%') return 'percent';
   return 'value';
 }
 
-function numeric(entity: EntitySnapshot | undefined): number | null {
+export function numeric(entity: EntitySnapshot | undefined): number | null {
   if (!entity || entity.missing) return null;
   const value = Number(entity.state);
   return entity.state.trim() !== '' && Number.isFinite(value) ? value : null;
 }
 
 /** Seconds since the instant the entity's state names, or null when it is not a time. */
-function elapsedSeconds(entity: EntitySnapshot | undefined, now: number): number | null {
+export function elapsedSeconds(entity: EntitySnapshot | undefined, now: number): number | null {
   if (!entity || entity.missing) return null;
   const then = Date.parse(entity.state);
   return Number.isFinite(then) ? Math.max(0, Math.round((now - then) / 1000)) : null;
 }
 
-function levelFor(ref: SystemMetricRef, entity: EntitySnapshot | undefined, value: number | null): Level {
+export function levelFor(ref: SystemMetricRef, entity: EntitySnapshot | undefined, value: number | null): Level {
   if (!entity || entity.missing || isProblem(entity)) return 'off';
   if (value === null) return 'ok';
   if (ref.crit !== undefined && value >= ref.crit) return 'crit';

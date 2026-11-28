@@ -104,7 +104,7 @@ interface Row {
 
 /**
  * The polled feed behind both renderings of the panel (AdsbPanel, and /tv's
- * split TvAdsbPanels): receiver position, the raw aircraft list, and the
+ * TvAdsbMap): receiver position, the raw aircraft list, and the
  * badged table rows derived from them.
  */
 function useAdsbFeed(refreshSeconds: number) {
@@ -332,21 +332,17 @@ export function AdsbPanel({ title, refreshSeconds }: AdsbPanelProps) {
 }
 
 /**
- * /tv's split pair, one shared feed: the map as the band's big cell, the
- * aircraft list as its own card beside it, so neither steals the other's
- * height. Returns two sibling panels - the band's flex row places them.
+ * /tv's flight card: the map alone, no aircraft list - the TV is a glance
+ * screen and the table is for the phone. The feed still polls so the header
+ * can say how many aircraft are being tracked.
  */
-export function TvAdsbPanels({ title, refreshSeconds }: AdsbPanelProps) {
+export function TvAdsbMap({ title, refreshSeconds }: AdsbPanelProps) {
   const feed = useAdsbFeed(refreshSeconds);
   return (
-    <>
-      <Panel title={title} aside={feedAside(feed)} className="tv-map-panel">
-        {/* hideButtons: tar1090's control strip is dead weight on a look-only screen. */}
-        <iframe className="adsb__map" src={`${ADSB_BASE}/?hideButtons`} title="Live ADS-B map (tar1090)" loading="lazy" />
-      </Panel>
-      <Panel title="Nearby aircraft" className="tv-flightlist-panel">
-        <AircraftTable {...feed} refreshSeconds={refreshSeconds} />
-      </Panel>
-    </>
+    <Panel title={title} aside={feedAside(feed)} className="tv-map-panel">
+      {/* hideButtons/hideSidebar: tar1090's control strip and its own aircraft
+          table are dead weight on a look-only screen - the map is the point. */}
+      <iframe className="adsb__map" src={`${ADSB_BASE}/?hideButtons&hideSidebar`} title="Live ADS-B map (tar1090)" loading="lazy" />
+    </Panel>
   );
 }

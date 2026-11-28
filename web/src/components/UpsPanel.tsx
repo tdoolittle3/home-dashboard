@@ -20,7 +20,7 @@ interface UpsPanelProps {
  * from `critical`, which is the guard actively saying the power is bad - the
  * guard covers "UPS unreachable" itself, so `off` is only ever a data gap.
  */
-type Mode = 'ok' | 'warning' | 'critical' | 'off';
+export type Mode = 'ok' | 'warning' | 'critical' | 'off';
 
 /** How often the on-battery countdown advances between the guard's minutely publishes. */
 const TICK_MS = 15_000;
@@ -53,7 +53,7 @@ function arcPath(from: number, to: number): string {
   return `M ${x0.toFixed(3)} ${y0.toFixed(3)} A ${RADIUS} ${RADIUS} 0 ${largeArc} 1 ${x1.toFixed(3)} ${y1.toFixed(3)}`;
 }
 
-function numeric(entity: EntitySnapshot | undefined): number | null {
+export function upsNumeric(entity: EntitySnapshot | undefined): number | null {
   if (!entity || entity.missing || DEAD_STATES.has(entity.state.toLowerCase())) return null;
   const value = Number(entity.state);
   return entity.state.trim() !== '' && Number.isFinite(value) ? value : null;
@@ -62,6 +62,15 @@ function numeric(entity: EntitySnapshot | undefined): number | null {
 function attrString(entity: EntitySnapshot | undefined, key: string): string | null {
   const value = entity?.attributes[key];
   return typeof value === 'string' && value.length > 0 ? value : null;
+}
+
+/** The guard's verdict when it is talking; the bare on/off as the fallback. */
+export function upsMode(problem: EntitySnapshot | undefined): Mode {
+  const dataLive = !!problem && !problem.missing && !DEAD_STATES.has(problem.state.toLowerCase());
+  if (!dataLive) return 'off';
+  const statusAttr = attrString(problem, 'status');
+  if (statusAttr === 'critical' || statusAttr === 'warning' || statusAttr === 'ok') return statusAttr;
+  return problem.state.toLowerCase() === 'on' ? 'warning' : 'ok';
 }
 
 /** "2h 07m" / "38m" - the shape a runtime is judged in during an outage. */
@@ -73,7 +82,7 @@ function formatRuntime(seconds: number): string {
 }
 
 /** The headline for the critical banner, from the raw NUT status tokens. */
-function criticalTitle(upsStatus: string | null): string {
+export function criticalTitle(upsStatus: string | null): string {
   const tokens = new Set((upsStatus ?? '').split(/\s+/));
   if (tokens.has('LB')) return 'LOW BATTERY';
   if (tokens.has('OB')) return 'ON BATTERY';
@@ -149,24 +158,14 @@ export function UpsPanel({ title, refs, entities, bare = false, compact = false 
   const chargeEntity = entities[refs.charge];
   const runtimeEntity = entities[refs.runtime];
 
-  const charge = numeric(chargeEntity);
-  const runtimeMin = numeric(runtimeEntity);
-  const load = numeric(entities[refs.load]);
-  const voltage = numeric(entities[refs.voltage]);
+  const charge = upsNumeric(chargeEntity);
+  const runtimeMin = upsNumeric(runtimeEntity);
+  const load = upsNumeric(entities[refs.load]);
+  const voltage = upsNumeric(entities[refs.voltage]);
 
-  const dataLive = !!problem && !problem.missing && !DEAD_STATES.has(problem.state.toLowerCase());
-  const statusAttr = attrString(problem, 'status');
   const reason = attrString(problem, 'reason');
   const upsStatus = attrString(problem, 'ups_status');
-
-  // The guard's verdict when it is talking; the bare on/off as the fallback.
-  const mode: Mode = !dataLive
-    ? 'off'
-    : statusAttr === 'critical' || statusAttr === 'warning' || statusAttr === 'ok'
-      ? statusAttr
-      : problem.state.toLowerCase() === 'on'
-        ? 'warning'
-        : 'ok';
+  const mode = upsMode(problem);
 
   // The countdown has to move on its own: the guard only publishes once a
   // minute, and a frozen number in a blackout reads as a crashed dashboard.

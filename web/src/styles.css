@@ -2790,57 +2790,174 @@ body.tv-page {
   background: #000;
 }
 
-.tv .topbar {
-  flex: none;
-  padding-bottom: 8px;
-  margin-bottom: 10px;
-}
-
 .tv-clock {
   color: var(--text);
   font-weight: 600;
 }
 
-/* Cameras flex to fill the top ~55% of the screen; the stills drop their
-   aspect ratio and cover their boxes so the row is exactly as tall as the
-   space allows, whatever shape the streams are. */
-.tv .hero {
-  flex: 5;
-  min-height: 0;
-  margin-bottom: var(--gap);
+/* The top bar stays one line: title + stream pill, the status chips
+   (TvStatusBar) in the middle, outdoor reading + clock pinned right. */
+.tv .topbar {
+  flex-wrap: nowrap;
 }
 
-.tv .hero .panel,
-.tv .hero .panel__body {
+.tv .topbar__brand {
+  flex: none;
+}
+
+.tv .topbar__meta--outdoor {
+  flex: none;
+  font-size: var(--fs-md);
+}
+
+.tv-statusbar {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  overflow: hidden;
+}
+
+.tv-chip {
+  --chip-tone: var(--up);
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 14px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, var(--chip-tone) 40%, var(--border));
+  background: color-mix(in srgb, var(--chip-tone) 8%, transparent);
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+}
+
+.tv-chip--warn {
+  --chip-tone: var(--warn);
+}
+
+.tv-chip--crit {
+  --chip-tone: var(--down);
+}
+
+.tv-chip--off {
+  --chip-tone: var(--idle);
+}
+
+.tv-chip__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--chip-tone);
+}
+
+.tv-chip__label {
+  color: var(--text-dim);
+}
+
+.tv-chip__value {
+  color: var(--text);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.tv-chip--warn .tv-chip__value,
+.tv-chip--crit .tv-chip__value {
+  color: var(--chip-tone);
+}
+
+.tv-chip--crit {
+  animation: ups-pulse 1.8s var(--ease) infinite;
+}
+
+/* The stage under the top bar: a narrow camera column down the left, the
+   photo slideshow as the big cell, and a short strip under the photos for
+   the flight map (plus any railed panels - fallback mode mostly). */
+.tv-layout {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  gap: var(--gap);
+  grid-template-columns: 440px minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr) 300px;
+}
+
+.tv-layout--no-cameras {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.tv-layout--no-cameras > * {
+  grid-column: 1;
+}
+
+.tv-cameras {
+  grid-column: 1;
+  grid-row: 1 / -1;
+  min-height: 0;
+}
+
+.tv-layout > .tv-slideshow {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+/* No strip under the photos: they take the full height. */
+.tv-layout > .tv-slideshow:last-child {
+  grid-row: 1 / -1;
+}
+
+.tv-strip {
+  grid-column: 2;
+  grid-row: 2;
+  min-height: 0;
+  display: flex;
+  gap: var(--gap);
+}
+
+/* No slideshow configured: the map grows into its space. */
+.tv-strip--tall {
+  grid-row: 1 / -1;
+}
+
+/* Cameras: one still per row, each cropped to fill an equal share of the
+   column, whatever shape the streams are. */
+.tv-cameras .panel,
+.tv-cameras .panel__body {
   height: 100%;
   display: flex;
   flex-direction: column;
   min-height: 0;
 }
 
-.tv .hero .panel__body {
+.tv-cameras .panel__body {
   flex: 1;
 }
 
-.tv .hero .cameras {
+.tv-cameras .panel__aside {
+  display: none;
+}
+
+.tv-cameras .cameras {
   flex: 1;
   min-height: 0;
-  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
+  grid-auto-rows: minmax(0, 1fr);
 }
 
-.tv .hero .camera {
+.tv-cameras .camera {
   height: 100%;
   min-height: 0;
   overflow: hidden;
 }
 
-.tv .hero .camera__open {
+.tv-cameras .camera__open {
   display: block;
   width: 100%;
   height: 100%;
 }
 
-.tv .hero .camera img {
+.tv-cameras .camera img {
   height: 100%;
   aspect-ratio: auto;
 }
@@ -2849,58 +2966,29 @@ body.tv-page {
   display: none;
 }
 
-/* Recent detections live below the fold on a fixed screen; the stills are the story here. */
-.tv .hero .subhead,
-.tv .hero .rows {
+/* Recent detections stay on the phone dashboard; the stills are the story here. */
+.tv-cameras .subhead,
+.tv-cameras .rows {
   display: none;
 }
 
-/* The bottom band, left to right: photos (when configured), the ADS-B map as
-   the big flexible cell, the aircraft list on its own card, then the one
-   merged status card (TvStatusPanel). The band is only ~430px tall, so every
-   card clips its own overflow against the fixed stage. */
-.tv-band {
-  flex: 4;
-  min-height: 0;
-  display: flex;
-  gap: var(--gap);
-}
-
-.tv-band > .tv-slideshow {
-  flex: 0 0 480px;
-}
-
-.tv-band > .panel {
+.tv-strip > .panel {
   min-height: 0;
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
 
-.tv-band > .panel .panel__body {
+.tv-strip > .panel .panel__body {
   flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
 }
 
-/* The map takes whatever the fixed-width cards leave over. */
 .tv-map-panel {
   flex: 1 1 auto;
   min-width: 0;
-}
-
-.tv-flightlist-panel {
-  flex: 0 0 400px;
-}
-
-.tv-status-panel {
-  flex: 0 0 700px;
-}
-
-/* A room with a single band card (e.g. uptime-only) lets it have the row. */
-.tv-band > .panel:only-child {
-  flex: 1 1 auto;
 }
 
 .tv-rail {
@@ -2918,92 +3006,14 @@ body.tv-page {
   overflow: hidden;
 }
 
-/* The map fills its card; the list card keeps the eight freshest rows and
-   drops the optional columns and the full-map link (nothing on a TV can
-   follow a link anyway). */
 .tv .adsb__map {
   flex: 1;
   min-height: 0;
   aspect-ratio: auto;
 }
 
-.tv .adsb__scroll {
-  flex: none;
-  overflow: hidden;
-}
-
-.tv .adsb__table tbody tr:nth-child(n + 9) {
-  display: none;
-}
-
-.tv .adsb__optional,
-.tv .adsb__open {
-  display: none;
-}
-
 .tv .empty {
   margin: auto;
-}
-
-/* --- the merged status card: Kuma light + battery gauge in a side column,
-   the system tiles squashed into the rest --- */
-
-.tv-status {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  gap: 20px;
-}
-
-.tv-status__side {
-  flex: 0 0 230px;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.tv-status__side .ups {
-  gap: 6px;
-}
-
-.tv-status__side .ups__gauge {
-  width: 150px;
-  height: 150px;
-}
-
-.tv-status__system {
-  flex: 1;
-  min-width: 0;
-  min-height: 0;
-  overflow: hidden;
-}
-
-.tv-status__system .system {
-  gap: 8px;
-}
-
-.tv-status__system .system__hero {
-  padding: 0 0 6px;
-}
-
-.tv-status__system .system__tiles {
-  gap: 8px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-}
-
-.tv-status__system .system__tile {
-  padding: 5px 10px 6px;
-  gap: 2px;
-}
-
-/* One notch down from the TV scale, so all nine readings fit three-wide. */
-.tv-status__system .system__tile-label {
-  font-size: 14px;
-}
-
-.tv-status__system .system__tile-value {
-  font-size: 19px;
 }
 
 /* The D-pad focus ring (TvApp.tsx owns which tile wears it). Inset, because

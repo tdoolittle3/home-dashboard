@@ -31,7 +31,7 @@ function summarize(data: KumaSummary): string {
  * cause or half the house. Pending only dims to yellow because Kuma reports
  * it while a monitor is still deciding, not once it has failed.
  */
-function health(data: KumaSummary): { level: 'ok' | 'degraded' | 'outage' | 'unknown'; title: string; sub: string } {
+export function health(data: KumaSummary): { level: 'ok' | 'degraded' | 'outage' | 'unknown'; title: string; sub: string } {
   const total = data.monitors.length;
   if (total === 0) return { level: 'unknown', title: 'No monitors', sub: 'nothing being watched yet' };
   const down = data.monitors.filter((monitor) => monitor.status === 'down').map((monitor) => monitor.name);

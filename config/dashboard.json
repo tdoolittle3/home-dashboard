@@ -35,7 +35,7 @@
     "slideshow": { "album": "323942f3-e088-406e-ae23-9cd1e1d0422a" },
     "rooms": {
       "default": { "panels": ["flights", "system", "power", "uptime"] },
-      "living": { "cameras": ["driveway", "backyard"], "panels": ["flights", "system", "power", "uptime"] },
+      "living": { "cameras": ["driveway", "backyard", "simplicam"], "panels": ["flights", "system", "power", "uptime"] },
       "bedroom": { "cameras": ["driveway"], "panels": ["uptime"] }
     }
   },
