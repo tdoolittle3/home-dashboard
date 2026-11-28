@@ -47,7 +47,8 @@
       "refreshSeconds": 5,
       "cameras": [
         { "name": "driveway", "label": "Driveway" },
-        { "name": "backyard", "label": "Backyard" }
+        { "name": "backyard", "label": "Backyard" },
+        { "name": "simplicam", "label": "Indoor" }
       ]
     },
     {
@@ -153,7 +154,8 @@
         { "entity_id": "binary_sensor.sink_moisture_detector", "name": "Kitchen sink leak" }
       ],
       "entities": [
-        { "entity_id": "switch.frontcam_white_light", "name": "Driveway white light" }
+        { "entity_id": "switch.frontcam_white_light", "name": "Driveway white light" },
+        { "entity_id": "switch.simplicam_shutter", "name": "Indoor camera shutter open" }
       ]
     }
   ],
