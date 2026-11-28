@@ -1,11 +1,11 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { TvAdsbPanels } from './components/AdsbPanel';
+import { TvAdsbMap } from './components/AdsbPanel';
 import { CamerasPanel } from './components/CamerasPanel';
 import { CameraViewer } from './components/CameraViewer';
 import { EntitiesPanel } from './components/EntitiesPanel';
 import { StoragePanel } from './components/StoragePanel';
 import { TvSlideshow } from './components/TvSlideshow';
-import { TvStatusPanel } from './components/TvStatusPanel';
+import { TvStatusBar } from './components/TvStatusBar';
 import { formatState } from './format';
 import type { Panel, TvRoom } from './types';
 import { useDashboard } from './useDashboard';
@@ -171,10 +171,9 @@ export function TvApp() {
   const railPanels = dashboard.panels.filter((panel) =>
     preset?.panels ? preset.panels.includes(panel.id) : LOOK_ONLY_TYPES.has(panel.type),
   );
-  // The band deals these into fixed roles: the ADS-B feed becomes the wide map
-  // plus its own aircraft-list card, and system/ups/uptime squash into the one
-  // status card so the map gets their old space. Anything else (entities,
-  // storage - fallback mode mostly) still rails.
+  // Dealt into fixed roles: the ADS-B feed is the map under the photos,
+  // system/ups/uptime collapse into chips in the top bar, and anything else
+  // (entities, storage - fallback mode mostly) rails beside the map.
   const adsbPanel = railPanels.find((panel): panel is Extract<Panel, { type: 'adsb' }> => panel.type === 'adsb');
   const systemPanel = railPanels.find((panel): panel is Extract<Panel, { type: 'system' }> => panel.type === 'system');
   const upsPanel = railPanels.find((panel): panel is Extract<Panel, { type: 'ups' }> => panel.type === 'ups');
@@ -182,6 +181,7 @@ export function TvApp() {
   const otherPanels = railPanels.filter((panel) => panel.type === 'entities');
 
   const slideshow = dashboard.tv?.slideshow;
+  const hasCameras = cameraPanel !== undefined && cameras.length > 0;
 
   const renderPanel = (panel: Panel) => {
     if (panel.type === 'entities') {
@@ -212,6 +212,14 @@ export function TvApp() {
             </span>
           </div>
         </div>
+        {systemPanel || upsPanel || hasKuma ? (
+          <TvStatusBar
+            systemMetrics={systemPanel?.metrics}
+            upsRefs={upsPanel?.entities}
+            kuma={hasKuma ? sources.uptimeKuma : undefined}
+            entities={entities}
+          />
+        ) : null}
         <span className="topbar__meta topbar__meta--outdoor">
           {dashboard.outdoor ? (
             <>
@@ -223,30 +231,29 @@ export function TvApp() {
         </span>
       </header>
 
-      {cameraPanel && cameras.length > 0 ? (
-        <div className="hero">
-          <CamerasPanel
-            title={cameraPanel.title}
-            cameras={cameras}
-            refreshSeconds={cameraPanel.refreshSeconds ?? 5}
-            stillHeight={720}
-            frigate={sources.frigate}
-            focusedIndex={safeFocus}
-          />
-        </div>
-      ) : null}
+      {/* Cameras stack down the left; photos own the rest, with the flight map
+          (and any railed panels) in a short strip beneath them. */}
+      <div className={hasCameras ? 'tv-layout' : 'tv-layout tv-layout--no-cameras'}>
+        {hasCameras && cameraPanel ? (
+          <div className="tv-cameras">
+            <CamerasPanel
+              title={cameraPanel.title}
+              cameras={cameras}
+              refreshSeconds={cameraPanel.refreshSeconds ?? 5}
+              stillHeight={360}
+              frigate={sources.frigate}
+              focusedIndex={safeFocus}
+            />
+          </div>
+        ) : null}
 
-      <div className="tv-band">
         {slideshow ? <TvSlideshow seconds={slideshow.seconds ?? 20} /> : null}
-        {adsbPanel ? <TvAdsbPanels title={adsbPanel.title} refreshSeconds={adsbPanel.refreshSeconds ?? 8} /> : null}
-        {otherPanels.length > 0 ? <div className="tv-rail">{otherPanels.map(renderPanel)}</div> : null}
-        {systemPanel || upsPanel || hasKuma ? (
-          <TvStatusPanel
-            systemMetrics={systemPanel?.metrics}
-            upsRefs={upsPanel?.entities}
-            kuma={hasKuma ? sources.uptimeKuma : undefined}
-            entities={entities}
-          />
+
+        {adsbPanel || otherPanels.length > 0 ? (
+          <div className={slideshow ? 'tv-strip' : 'tv-strip tv-strip--tall'}>
+            {adsbPanel ? <TvAdsbMap title={adsbPanel.title} refreshSeconds={adsbPanel.refreshSeconds ?? 8} /> : null}
+            {otherPanels.length > 0 ? <div className="tv-rail">{otherPanels.map(renderPanel)}</div> : null}
+          </div>
         ) : null}
       </div>
 
